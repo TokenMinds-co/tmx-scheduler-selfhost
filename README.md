@@ -279,24 +279,35 @@ on the host is what serves it (`main.ts` trusts exactly one proxy hop).
 docker compose -f backend/docker-compose.yml up --build
 ```
 
-Brings up Postgres (host port 5434), Redis and the backend built from source.
-`DATABASE_URL` and `REDIS_URL` from `.env` are overridden to reach the sibling
-containers. This is for testing the image; day-to-day development uses the root
-`docker-compose.yml` with the app running on the host.
+Runs the backend from source against the Postgres and Redis you already have —
+the `local-postgres` container on 5433 and the root compose file's Redis on
+6379, both reached through `host.docker.internal` because inside a container
+"localhost" is the container. So `pnpm infra:up` first. This is for checking
+the image; day-to-day development uses the root `docker-compose.yml` with the
+app running on the host.
 
 ### The server
 
 [`backend/docker-compose-production.yml`](backend/docker-compose-production.yml)
-pulls the image instead of building. Postgres is the server's shared instance,
-reached over the external `postgres_network`; Redis is part of the stack, with
-no host port. One-time setup on the VPS:
+pulls the image instead of building, and defines **one service**. Postgres and
+Redis are the server's own shared containers: they outlive any deploy and are
+never restarted when the API is replaced. The backend only joins their
+networks, both declared `external` so Compose refuses to start rather than
+quietly bringing up an API that can reach neither. Addresses come from
+`DATABASE_URL` and `REDIS_URL` in `.env`, where they name those containers.
+
+One-time setup on the VPS:
 
 ```bash
 git clone https://github.com/TokenMinds-co/tmx-scheduler.git
 cp tmx-scheduler/backend/.env.example tmx-scheduler/backend/.env
-# fill in: DATABASE_URL (by container name on postgres_network), CREDS_KEY,
+# fill in: DATABASE_URL and REDIS_URL (by container name), CREDS_KEY,
 # JWT_SECRET, UNSUBSCRIBE_SECRET, TRACKING_SECRET, PUBLIC_API_URL,
 # TRACKING_BASE_URL, CORS_ORIGINS, SEED_ADMIN_*
+
+# Both networks must exist and have the shared container attached:
+docker network create redis_network        # postgres_network already exists
+docker network connect redis_network <redis container>
 ```
 
 The workflow needs three repository secrets: `VPS_STAGING_HOST`,

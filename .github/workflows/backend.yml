@@ -188,8 +188,9 @@ jobs:
             echo "[deploy] pulling $IMAGE_FULL:$IMAGE_TAG"
             docker pull "$IMAGE_FULL:$IMAGE_TAG"
 
-            # `up -d` alone recreates only what changed, so Redis keeps its
-            # volume and its uptime while the backend is replaced.
+            # `up -d`, not `down` then `up`: it replaces the one container
+            # whose image changed. Postgres and Redis are not in this stack at
+            # all, so a deploy never interrupts them.
             IMAGE_NAME="$IMAGE_FULL" IMAGE_TAG="$IMAGE_TAG" \
               docker compose -f "$COMPOSE_FILE" up -d --remove-orphans
 

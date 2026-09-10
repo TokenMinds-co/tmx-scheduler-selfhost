@@ -1,10 +1,22 @@
-# Production deploy. Pulls a pre-built image from GHCR instead of building.
-# The CI deploy job sets IMAGE_NAME + IMAGE_TAG and runs `docker compose up -d`.
+# Production deploy. One service: the backend. It pulls a pre-built image from
+# GHCR instead of building, and the CI deploy job sets IMAGE_NAME + IMAGE_TAG
+# and runs `docker compose up -d`.
 #
-# Postgres is external — the server's shared instance on `postgres_network`.
-# Set DATABASE_URL in .env to reach it by container name. Redis is part of
-# this stack: it only ever holds work that is due right now (the schedule
-# lives in Postgres), so it needs no sharing and no host port.
+# Postgres and Redis are NOT part of this stack. Both are shared services the
+# server already runs, so they outlive any deploy here and are not restarted
+# when the API is replaced. This container only joins their networks; the
+# addresses themselves come from DATABASE_URL and REDIS_URL in .env, where they
+# name the other containers, e.g.
+#
+#   DATABASE_URL=postgresql://user:pass@local-postgres:5432/mail_scheduler?schema=public
+#   REDIS_URL=redis://redis:6379
+#
+# Both networks below are `external`, so Compose refuses to start if either is
+# missing rather than quietly bringing up a backend that cannot reach anything.
+# Creating one and attaching the shared container is two commands:
+#
+#   docker network create redis_network
+#   docker network connect redis_network <redis container>
 #
 # Explicit project name. Without it, Compose derives the project from the
 # directory basename ("backend"), which collides with sibling repos deployed
@@ -12,34 +24,6 @@
 # THEIR containers as orphans and delete them. A unique name isolates this stack.
 name: tmx
 services:
-  redis:
-    image: redis:7-alpine
-    container_name: tmx_redis
-    restart: unless-stopped
-    # appendonly: a due job claimed from Postgres exists only in Redis until
-    # the worker finishes it; losing it on a Redis restart would leave that row
-    # in `sending` until the reaper returns it. Persistence shortens that gap.
-    command: ["redis-server", "--appendonly", "yes"]
-    deploy:
-      resources:
-        limits:
-          memory: 128M
-          cpus: "0.25"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 10
-    volumes:
-      - redis_data:/data
-    networks:
-      - tmx_network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
   backend:
     image: ${IMAGE_NAME:-ghcr.io/tokenminds-co/tmx-scheduler-backend}:${IMAGE_TAG:-production-latest}
     container_name: tmx_be
@@ -50,8 +34,6 @@ services:
       - NODE_ENV=production
       # Fixed inside the container. PORT in .env is the HOST port (see `ports:`).
       - PORT=4000
-      # The stack's own Redis, not whatever REDIS_URL in .env says.
-      - REDIS_URL=redis://redis:6379
     deploy:
       resources:
         limits:
@@ -78,12 +60,9 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-    depends_on:
-      redis:
-        condition: service_healthy
     networks:
-      - tmx_network
       - postgres_network
+      - redis_network
     ports:
       # Loopback only: the reverse proxy on the host is what serves it (main.ts
       # trusts exactly one proxy hop). Publishing on 0.0.0.0 would bypass the
@@ -96,12 +75,8 @@ services:
         max-size: "10m"
         max-file: "3"
 
-volumes:
-  redis_data:
-    driver: local
-
 networks:
-  tmx_network:
-    driver: bridge
   postgres_network:
+    external: true
+  redis_network:
     external: true

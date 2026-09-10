@@ -1,74 +1,22 @@
-# Full containerised stack, built from source. Use it to test the production
-# image locally; for day-to-day development the root docker-compose.yml
-# (Redis + Mailpit, app running on the host) is the faster loop.
+# Runs the production image locally, built from source. Use it to check the
+# image itself — the container, the migration step, the health probe. For
+# day-to-day development the root docker-compose.yml (Redis and Mailpit, app
+# running on the host) is the faster loop.
 #
-#   cp backend/.env.example backend/.env       # then fill in the secrets
 #   docker compose -f backend/docker-compose.yml up --build
 #
-# Explicit project name. Without it, Compose derives the project from the
-# directory basename ("backend"), which collides with sibling repos deployed
-# from their own "backend" dir — and `down --remove-orphans` would then treat
-# THEIR containers as orphans and delete them. A unique name isolates this
-# stack. It is also distinct from the root compose file's project so the two
-# never fight over each other's containers.
+# One service, like production: Postgres and Redis stay where they already are.
+# Locally that is the `local-postgres` container on host port 5433 and the
+# `ims-redis` from the root compose file on 6379, so both are reached through
+# `host.docker.internal` — inside a container, "localhost" is the container.
+# Every other value comes from backend/.env unchanged.
+#
+# Explicit project name so `down --remove-orphans` stays scoped to this stack
+# and never touches sibling projects that also live in a "backend" directory.
+# It is also distinct from the root compose file's project, so the two never
+# fight over each other's containers.
 name: tmx
 services:
-  postgres:
-    image: postgres:17-alpine
-    container_name: tmx_pg
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: mail_scheduler
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-          cpus: "0.5"
-        reservations:
-          memory: 256M
-          cpus: "0.25"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d mail_scheduler"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - tmx_network
-    ports:
-      # 5434 on the host: 5432 and 5433 are usually taken by a local Postgres
-      # and the shared local-postgres container respectively.
-      - "127.0.0.1:5434:5432"
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-  redis:
-    image: redis:7-alpine
-    container_name: tmx_redis
-    restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-    volumes:
-      - redis_data:/data
-    networks:
-      - tmx_network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
   backend:
     build:
       # .. is the workspace root: the install needs pnpm-lock.yaml and
@@ -84,11 +32,16 @@ services:
       - NODE_ENV=production
       # Fixed inside the container. PORT in .env is the HOST port (see `ports:`).
       - PORT=4000
-      # DATABASE_URL / REDIS_URL in .env point at localhost, which inside a
-      # container means the container itself — so both are overridden to reach
-      # the sibling services.
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/mail_scheduler?schema=public
-      - REDIS_URL=redis://redis:6379
+      # DATABASE_URL and REDIS_URL in .env point at localhost, which inside a
+      # container means the container itself. Rewritten to the host, where both
+      # services actually are. The ports match .env: 5433 for local-postgres,
+      # 6379 for the root compose file's Redis.
+      - DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5433/mail_scheduler?schema=public
+      - REDIS_URL=redis://host.docker.internal:6379
+    # Docker Desktop resolves host.docker.internal on its own; on Linux it does
+    # not exist until this maps it to the bridge gateway.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     deploy:
       resources:
         limits:
@@ -115,13 +68,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - tmx_network
     ports:
       # host (from .env PORT, default 4000) : container/app port (fixed 4000)
       - "127.0.0.1:${PORT:-4000}:4000"
@@ -130,13 +76,3 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-
-volumes:
-  postgres_data:
-    driver: local
-  redis_data:
-    driver: local
-
-networks:
-  tmx_network:
-    driver: bridge
