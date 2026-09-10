@@ -278,7 +278,7 @@ jobs:
 
             echo "[deploy] done: $IMAGE_FULL:$IMAGE_TAG"
         env:
-          # Path on the server holding the repo clone (compose file + .env).
+          # Paths on the server holding the repo clone (compose file + .env).
           DEPLOY_PATH: "tmx-scheduler"
           COMPOSE_FILE: backend/docker-compose-production.yml
           # head_ref is set only on pull_request events and holds the real
