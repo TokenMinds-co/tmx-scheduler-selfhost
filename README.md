@@ -232,13 +232,21 @@ frontend is not covered by that workflow.
 
 | Trigger | What runs |
 |---|---|
-| PR to `main` touching backend paths | install → build shared → typecheck → unit tests → build |
-| Push to `main` touching backend paths | build image → push to GHCR → SSH deploy → verify |
+| PR to `main` touching backend paths | typecheck → unit tests → build, **and** image → GHCR → deploy |
+| Push to `main` touching backend paths | image → push to GHCR → SSH deploy → verify |
 | **Run workflow** (manual) | same as a push, without needing a commit |
 
 Backend paths are `backend/**`, `packages/shared/**`, the root manifests and
 lockfile, `.dockerignore` and the workflow itself. A frontend-only or docs-only
 push does not spend a deploy.
+
+**Pull requests currently deploy**, so a branch can be exercised on the real
+server before it merges. There is one server, so whichever branch built last is
+what is running — and a PR build does not move the `production-latest` tag, only
+the `<short-sha>` one the deploy pins to. To go back to deploying only `main`,
+restore `if: github.event_name != 'pull_request'` on the `build-and-push` and
+`deploy` jobs; the workflow carries a comment on each saying so. Nothing else
+needs changing.
 
 ### The image
 

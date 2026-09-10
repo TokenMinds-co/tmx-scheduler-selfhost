@@ -34,18 +34,20 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: tmx-scheduler-backend
 
-# One deploy at a time. Two overlapping pushes to main would otherwise race on
-# `compose up` and could leave the server running the older image.
-# cancel-in-progress is off on purpose: cancelling mid-deploy is worse than
-# queueing.
+# One run per branch. cancel-in-progress is off on purpose: a run that reaches
+# the deploy job is touching the server, and cancelling mid-deploy is worse
+# than queueing.
+#
+# This groups by ref, so it does NOT stop a PR and main from deploying at the
+# same time — the deploy job carries its own single-slot group for that.
 concurrency:
   group: backend-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   # -------------------------------------------------------------------------
-  # Pull requests: prove it compiles and the unit tests pass. No image, no
-  # deploy.
+  # Pull requests: prove it compiles and the unit tests pass. This is the only
+  # job that runs the test suite — the image build does not.
   # -------------------------------------------------------------------------
   build-check:
     name: Build Check
@@ -87,11 +89,19 @@ jobs:
         run: pnpm --filter backend build
 
   # -------------------------------------------------------------------------
-  # main: build the image and push it to GHCR.
+  # Build the image and push it to GHCR.
+  #
+  # TEMPORARY: this also runs on pull requests, so a branch can be exercised on
+  # the real server before it merges. To go back to deploying only `main`, add
+  # back to this job and to `deploy`:
+  #
+  #     if: github.event_name != 'pull_request'
+  #
+  # Nothing else here is PR-specific — the checkout ref and the tag below are
+  # correct either way.
   # -------------------------------------------------------------------------
   build-and-push:
     name: Build & Push Image
-    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -100,12 +110,22 @@ jobs:
       image: ${{ steps.image.outputs.image }}
       image_tag: ${{ steps.sha.outputs.short_sha }}
     steps:
+      # On a pull_request event the default checkout is the *merge* commit,
+      # which exists only on the runner. Build the branch head instead: it is
+      # what the server checks out, and it is a real commit someone can go look
+      # at when a deployed build misbehaves.
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
+      # --short alone gives however many characters git thinks are unambiguous,
+      # which can grow. The tag, the COMMIT_SHA in the image and the string the
+      # deploy greps for in /health all come from this one value, so it is
+      # pinned to a fixed width.
       - name: Resolve commit SHA
         id: sha
-        run: echo "short_sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+        run: echo "short_sha=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
 
       # GHCR rejects uppercase in a path, and GitHub org names are not
       # lowercased for us (TokenMinds-co).
@@ -134,9 +154,19 @@ jobs:
           images: ${{ steps.image.outputs.image }}
           # Two tags: the immutable <short-sha> the deploy pins to, and a
           # moving pointer for anything that just wants "current".
+          #
+          # The sha tag is `type=raw` off the step above rather than
+          # `type=sha`, so that the tag, the COMMIT_SHA baked into the image and
+          # the value the deploy pulls are the same string by construction.
+          # `type=sha` derives its own, and on a pull_request event it resolves
+          # against a different commit than the runner has checked out — the
+          # deploy would then pull a tag that was never pushed.
+          #
+          # production-latest stays a main-only pointer. A PR build is a real
+          # image with a real tag, but it is not what "current" means.
           tags: |
-            type=sha,prefix=,format=short
-            type=raw,value=production-latest
+            type=raw,value=${{ steps.sha.outputs.short_sha }}
+            type=raw,value=production-latest,enable=${{ github.event_name != 'pull_request' }}
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -154,13 +184,26 @@ jobs:
             COMMIT_SHA=${{ steps.sha.outputs.short_sha }}
 
   # -------------------------------------------------------------------------
-  # main: pull the image on the server, restart the stack, verify it answers.
+  # Pull the image on the server, restart the backend, verify it answers.
+  #
+  # TEMPORARY: runs on pull requests too — see the note on `build-and-push`.
+  # There is one server, so while this is on, whichever branch built last is
+  # what is running.
   # -------------------------------------------------------------------------
   deploy:
     name: Deploy to Server
-    if: github.event_name != 'pull_request'
     needs: build-and-push
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # The server pulls from GHCR with the token this job hands it.
+      packages: read
+    # There is one server, so every deploy takes the same single slot no matter
+    # which branch it came from. The workflow-level group is per-ref and would
+    # happily let a PR and main run `compose up` on top of each other.
+    concurrency:
+      group: backend-deploy
+      cancel-in-progress: false
     steps:
       - name: SSH deploy
         uses: appleboy/ssh-action@v1.2.0
@@ -240,8 +283,10 @@ jobs:
           COMPOSE_FILE: backend/docker-compose-production.yml
           # head_ref is set only on pull_request events and holds the real
           # source branch; ref_name there would be "<PR-number>/merge", which
-          # the server cannot check out. Correct on every trigger this job can
-          # run under, so it is safe even if deploys are ever opened to PRs.
+          # the server cannot check out. This is what lets a PR deploy at all,
+          # and it assumes the PR comes from a branch in this repo rather than
+          # a fork — a fork's branch is not on origin, and a fork PR gets no
+          # secrets to reach the server with either way.
           DEPLOY_REF: ${{ github.head_ref || github.ref_name }}
           REGISTRY: ${{ env.REGISTRY }}
           IMAGE_FULL: ${{ needs.build-and-push.outputs.image }}
