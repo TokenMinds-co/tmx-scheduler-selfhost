@@ -8,6 +8,8 @@ backend/           NestJS API + poller + send worker (Prisma + Postgres)
 frontend/          Next.js admin UI
 packages/shared/   TypeScript contracts both sides import (@ims/shared)
 docker-compose.yml Redis and Mailpit for local work (Postgres is external)
+backend/Dockerfile Production image; backend/docker-compose*.yml run it
+.github/workflows/ CI on pull requests, image build + deploy on main
 ```
 
 ## Quick start
@@ -221,6 +223,114 @@ pnpm --filter backend db:migrate   # create/apply a migration in development
 pnpm --filter backend db:deploy    # apply pending migrations (production)
 pnpm --filter backend db:studio    # browse the data
 ```
+
+## Deployment
+
+The backend ships as a Docker image on GHCR and is deployed to a VPS over SSH
+by [`.github/workflows/backend.yml`](.github/workflows/backend.yml). The
+frontend is not covered by that workflow.
+
+| Trigger | What runs |
+|---|---|
+| PR to `main` touching backend paths | typecheck → unit tests → build, **and** image → GHCR → deploy |
+| Push to `main` touching backend paths | image → push to GHCR → SSH deploy → verify |
+| **Run workflow** (manual) | same as a push, without needing a commit |
+
+Backend paths are `backend/**`, `packages/shared/**`, the root manifests and
+lockfile, `.dockerignore` and the workflow itself. A frontend-only or docs-only
+push does not spend a deploy.
+
+**Pull requests currently deploy**, so a branch can be exercised on the real
+server before it merges. There is one server, so whichever branch built last is
+what is running — and a PR build does not move the `production-latest` tag, only
+the `<short-sha>` one the deploy pins to. To go back to deploying only `main`,
+restore `if: github.event_name != 'pull_request'` on the `build-and-push` and
+`deploy` jobs; the workflow carries a comment on each saying so. Nothing else
+needs changing.
+
+### The image
+
+[`backend/Dockerfile`](backend/Dockerfile) builds from the **workspace root**,
+not from `backend/` — the install needs `pnpm-lock.yaml`, `pnpm-workspace.yaml`
+and `packages/shared`:
+
+```bash
+docker build -f backend/Dockerfile -t tmx-scheduler-backend .
+```
+
+Builder stage installs and compiles; production stage reinstalls with `--prod`
+and copies `dist/` across. Worth knowing:
+
+- `--filter backend...` (trailing dots included) selects the backend and its
+  workspace dependencies, so the frontend's Next/React tree is never installed.
+  Its `package.json` still has to be copied in, or pnpm cannot resolve the
+  workspace graph.
+- `backend/prisma` is copied **before** `pnpm install` in both stages, because
+  the backend's `postinstall` runs `prisma generate` and needs the schema.
+- `prisma` is a runtime dependency, not a dev one: the image's `CMD` runs
+  `prisma migrate deploy` and then `exec`s Nest, so a container that cannot
+  migrate never serves. Right for one replica; at several, move the migrate to
+  a one-shot job.
+- pnpm comes from corepack, which reads `packageManager` in the root
+  `package.json` — the same version CI and developers use.
+
+### Ports
+
+The app reads `PORT` (default 4000). Both compose files pin it to **4000 inside
+the container** and treat `PORT` in `backend/.env` as the **host** port, which
+is what `"127.0.0.1:${PORT:-4000}:4000"` reads. Loopback only: a reverse proxy
+on the host is what serves it (`main.ts` trusts exactly one proxy hop).
+
+### Running the image locally
+
+```bash
+docker compose -f backend/docker-compose.yml up --build
+```
+
+Runs the backend from source against the Postgres and Redis you already have —
+the `local-postgres` container on 5433 and the root compose file's Redis on
+6379, both reached through `host.docker.internal` because inside a container
+"localhost" is the container. So `pnpm infra:up` first. This is for checking
+the image; day-to-day development uses the root `docker-compose.yml` with the
+app running on the host.
+
+### The server
+
+[`backend/docker-compose-production.yml`](backend/docker-compose-production.yml)
+pulls the image instead of building, and defines **one service**. Postgres and
+Redis are the server's own shared containers: they outlive any deploy and are
+never restarted when the API is replaced. The backend only joins their
+networks, both declared `external` so Compose refuses to start rather than
+quietly bringing up an API that can reach neither. Addresses come from
+`DATABASE_URL` and `REDIS_URL` in `.env`, where they name those containers.
+
+One-time setup on the VPS:
+
+```bash
+git clone https://github.com/TokenMinds-co/tmx-scheduler.git
+cp tmx-scheduler/backend/.env.example tmx-scheduler/backend/.env
+# fill in: DATABASE_URL and REDIS_URL (by container name), CREDS_KEY,
+# JWT_SECRET, UNSUBSCRIBE_SECRET, TRACKING_SECRET, PUBLIC_API_URL,
+# TRACKING_BASE_URL, CORS_ORIGINS, SEED_ADMIN_*
+
+# Both networks must exist and have the shared container attached:
+docker network create redis_network        # postgres_network already exists
+docker network connect redis_network <redis container>
+```
+
+The workflow needs three repository secrets: `VPS_STAGING_HOST`,
+`VPS_STAGING_USER` and `VPS_STAGING_KEY` (a private key whose public half is in
+that user's `authorized_keys`). `GITHUB_TOKEN` handles GHCR on both ends.
+
+Each deploy checks the server's clone out at the deployed commit, pulls the
+`<short-sha>` tag, runs `docker compose up -d`, then polls `GET /health` from
+inside the container until it answers 200 and reports the same `version` as
+the tag it pulled — so a deploy that silently kept the old container fails
+loudly. Old image tags are removed afterwards so they do not fill the disk.
+
+`/health` answers **503** while Postgres is unreachable. The compose healthcheck
+only reads the status line, so this is what makes it a real check rather than
+one nothing could fail.
 
 ## Still open
 

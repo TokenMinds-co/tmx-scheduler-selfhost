@@ -1,0 +1,82 @@
+# Production deploy. One service: the backend. It pulls a pre-built image from
+# GHCR instead of building, and the CI deploy job sets IMAGE_NAME + IMAGE_TAG
+# and runs `docker compose up -d`.
+#
+# Postgres and Redis are NOT part of this stack. Both are shared services the
+# server already runs, so they outlive any deploy here and are not restarted
+# when the API is replaced. This container only joins their networks; the
+# addresses themselves come from DATABASE_URL and REDIS_URL in .env, where they
+# name the other containers, e.g.
+#
+#   DATABASE_URL=postgresql://user:pass@local-postgres:5432/mail_scheduler?schema=public
+#   REDIS_URL=redis://redis:6379
+#
+# Both networks below are `external`, so Compose refuses to start if either is
+# missing rather than quietly bringing up a backend that cannot reach anything.
+# Creating one and attaching the shared container is two commands:
+#
+#   docker network create redis_network
+#   docker network connect redis_network <redis container>
+#
+# Explicit project name. Without it, Compose derives the project from the
+# directory basename ("backend"), which collides with sibling repos deployed
+# from their own "backend" dir — and `down --remove-orphans` would then treat
+# THEIR containers as orphans and delete them. A unique name isolates this stack.
+name: tmx
+services:
+  backend:
+    image: ${IMAGE_NAME:-ghcr.io/tokenminds-co/tmx-scheduler-backend}:${IMAGE_TAG:-production-latest}
+    container_name: tmx_be
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      # Fixed inside the container. PORT in .env is the HOST port (see `ports:`).
+      - PORT=4000
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+        reservations:
+          memory: 256M
+          cpus: "0.5"
+    healthcheck:
+      # /health answers 503 until migrations finish and Postgres is reachable,
+      # which is what makes --spider (status line only) a real check.
+      # 127.0.0.1, not localhost: localhost resolves to ::1 first in this
+      # container and the app binds IPv4, so a localhost probe is refused.
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://127.0.0.1:4000/health",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - postgres_network
+      - redis_network
+    ports:
+      # Loopback only: the reverse proxy on the host is what serves it (main.ts
+      # trusts exactly one proxy hop). Publishing on 0.0.0.0 would bypass the
+      # host firewall and expose an admin API directly.
+      # host (from .env PORT, default 4000) : container/app port (fixed 4000)
+      - "127.0.0.1:${PORT:-4000}:4000"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  postgres_network:
+    external: true
+  redis_network:
+    external: true
