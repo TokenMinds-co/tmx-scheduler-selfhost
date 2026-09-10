@@ -1,0 +1,22 @@
+{
+  "name": "internal-mail-scheduler",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.24.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "dev": "pnpm -r --parallel --filter ./backend --filter ./frontend dev",
+    "dev:backend": "pnpm --filter backend dev",
+    "dev:frontend": "pnpm --filter frontend dev",
+    "build": "pnpm --filter @ims/shared build && pnpm -r --filter ./backend --filter ./frontend build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm --filter backend test",
+    "lint": "pnpm -r lint",
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down",
+    "seed": "pnpm --filter backend seed"
+  }
+}

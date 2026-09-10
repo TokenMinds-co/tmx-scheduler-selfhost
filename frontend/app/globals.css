@@ -1,0 +1,139 @@
+@import 'tailwindcss';
+
+/*
+ * TMX Scheduler palette. One token set, defined light-first and redefined for
+ * dark, so a status pill in the queue and a stat tile on the dashboard cannot
+ * drift apart. Dark is a deep violet rather than a neutral slate — the brand
+ * reads as purple in both themes instead of losing its identity at night.
+ */
+@theme {
+  --color-canvas: #faf8fd;
+  --color-surface: #ffffff;
+  --color-border: #ebe4f7;
+  --color-ink: #17102b;
+  --color-muted: #6b6480;
+  --color-accent: #7c3aed;
+  --color-accent-soft: #f3ebff;
+
+  /* Endpoints of the brand gradient used on primary buttons and the wordmark. */
+  --color-brand-from: #8b2fd6;
+  --color-brand-to: #b45cf5;
+
+  --color-pending: #b45309;
+  --color-pending-soft: #fef3c7;
+  --color-sending: #4338ca;
+  --color-sending-soft: #e6e2fd;
+  --color-sent: #15803d;
+  --color-sent-soft: #dcfce7;
+  --color-failed: #b91c1c;
+  --color-failed-soft: #fee2e2;
+  --color-cancelled: #5b5470;
+  --color-cancelled-soft: #f2eefa;
+
+  /* The side rail is deliberately dark against the light workspace: it is
+     chrome, not content, and the contrast keeps the eye on the page body. */
+  --color-sidebar-from: #3a0d5c;
+  --color-sidebar-to: #240740;
+  --color-sidebar-ink: #f4ecfd;
+  --color-sidebar-muted: #b6a1d1;
+
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, -apple-system,
+    'Segoe UI', Roboto, sans-serif;
+}
+
+html,
+body {
+  /* Pins form controls, scrollbars and the viewer chrome to light so the
+     browser does not repaint half the UI dark on a dark-mode machine. */
+  color-scheme: light;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The brand gradient, as a utility so the wordmark, primary buttons and the
+   guide's step pins all draw from one definition. */
+.brand-gradient {
+  background-image: linear-gradient(
+    100deg,
+    var(--color-brand-from),
+    var(--color-brand-to)
+  );
+}
+
+.brand-text {
+  background-image: linear-gradient(
+    100deg,
+    var(--color-brand-from),
+    var(--color-brand-to)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Tables of scheduled mail are always wider than a laptop; the page itself
+   must never scroll sideways, so each table owns its own scroll container. */
+.table-scroll {
+  overflow-x: auto;
+}
+
+.table-scroll table {
+  min-width: 56rem;
+}
+
+.sidebar-gradient {
+  background-image: linear-gradient(
+    170deg,
+    var(--color-sidebar-from),
+    var(--color-sidebar-to)
+  );
+}
+
+/*
+ * One look for every data table. Pages used to carry their own thead and row
+ * classes, which drifted; and every row drew a bottom border, so the last one
+ * doubled up against the card footer.
+ */
+.data-table {
+  width: 100%;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.data-table thead {
+  text-align: left;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-muted);
+}
+
+.data-table th {
+  padding: 0.5rem 1rem;
+  font-weight: 500;
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.data-table td {
+  padding: 0.625rem 1rem;
+  vertical-align: top;
+}
+
+.data-table tbody tr {
+  border-bottom: 1px solid color-mix(in oklab, var(--color-border) 60%, transparent);
+  transition: background-color 120ms;
+}
+
+.data-table tbody tr:last-child {
+  border-bottom: 0;
+}
+
+.data-table tbody tr:hover {
+  background-color: color-mix(in oklab, var(--color-accent-soft) 45%, transparent);
+}

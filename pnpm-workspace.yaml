@@ -1,0 +1,22 @@
+packages:
+  - backend
+  - frontend
+  - packages/*
+
+# Native optional accelerators (file watching, msgpack, resolver, Tailwind's
+# Rust core). Allowed so pnpm runs their install scripts instead of warning on
+# every command; none of them is required for correctness.
+allowBuilds:
+  '@parcel/watcher': true
+  '@tailwindcss/oxide': true
+  msgpackr-extract: true
+  unrs-resolver: true
+  sharp: true
+  # Not needed by either app at runtime.
+  esbuild: false
+  workerd: false
+  # Prisma downloads its query engine in a postinstall script; without this
+  # the client cannot connect at all.
+  '@prisma/client': true
+  '@prisma/engines': true
+  prisma: true

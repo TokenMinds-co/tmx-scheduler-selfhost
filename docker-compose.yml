@@ -1,0 +1,38 @@
+# Local infrastructure for TMX Scheduler.
+#
+# Postgres is deliberately not here: the database lives in the existing
+# `local-postgres` container on 127.0.0.1:5433, in its own `mail_scheduler`
+# database alongside whatever else that server holds. DATABASE_URL in
+# backend/.env points at it.
+#
+# Every port below is published on 127.0.0.1 only. Redis runs without
+# authentication, so binding it to 0.0.0.0 would put an open datastore on
+# whatever network the laptop is joined to.
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: ims-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Catches every outbound SMTP send in development so no real mail escapes.
+  # Web UI on http://localhost:8025, SMTP on 1025 (no auth, no TLS).
+  # No volume: the inbox is disposable and empties when the container is
+  # recreated.
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: ims-mailpit
+    ports:
+      - "127.0.0.1:8025:8025"
+      - "127.0.0.1:1025:1025"
+
+volumes:
+  redis-data:

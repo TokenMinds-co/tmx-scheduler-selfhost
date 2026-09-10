@@ -1,0 +1,258 @@
+// TMX Scheduler — Postgres schema.
+//
+// Ported from the original Mongoose models. Every collection became a table
+// with the same fields and the same indexes; the notable differences are
+// recorded against the models they affect.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Values match the string unions in @ims/shared exactly, so a Prisma enum and
+// the shared type are interchangeable without casting on either side.
+enum EmailStatus {
+  pending
+  sending
+  sent
+  failed
+  cancelled
+}
+
+enum AuthType {
+  smtp_password
+  oauth_google
+  oauth_microsoft
+}
+
+enum UserRole {
+  admin
+  operator
+}
+
+enum EmailEventKind {
+  open
+  click
+}
+
+enum SuppressionReason {
+  bounce
+  unsubscribe
+  complaint
+  manual
+  reply_no
+}
+
+/// Operators of the tool itself — unrelated to the mailboxes it sends from.
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  email        String    @unique
+  name         String
+  passwordHash String
+  role         UserRole  @default(operator)
+  active       Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@map("users")
+}
+
+/// A sending mailbox: its SMTP connection, its signature and its pacing.
+model Account {
+  id          String   @id @default(uuid()) @db.Uuid
+  email       String   @unique
+  displayName String
+  authType    AuthType @default(smtp_password)
+
+  smtpHost String
+  smtpPort Int    @default(587)
+  smtpUser String
+
+  /// Whether STARTTLS must succeed on a non-465 port. False only for a
+  /// plain-SMTP relay on the same host.
+  requireTls Boolean @default(true)
+
+  /// AES-256-GCM ciphertext. Never leaves the server.
+  smtpPasswordEnc      String?
+  oauthClientId        String?
+  oauthClientSecretEnc String?
+  oauthRefreshTokenEnc String?
+  /// Microsoft only: the directory the app registration lives in.
+  oauthTenantId        String?
+
+  signatureHtml String @default("")
+  signatureText String @default("")
+
+  dailyLimit    Int    @default(20)
+  minGapSeconds Int    @default(45)
+  /// IANA zone deciding when `sentToday` rolls over. Per account because a
+  /// mailbox's "day" should follow the market it works, not the server locale.
+  timezone      String @default("Asia/Singapore")
+
+  sentToday Int @default(0)
+  /// `yyyy-LL-dd` in the account's own timezone, not UTC.
+  sentTodayDate  String?
+  lastSentAt     DateTime?
+  lastError      String?
+  lastVerifiedAt DateTime?
+
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("accounts")
+}
+
+/// One scheduled message.
+///
+/// `accountId` is an indexed column rather than a foreign key, which preserves
+/// the delete semantics the app was built on: removing a mailbox leaves its
+/// sent history intact rather than cascading it away, and a queued row whose
+/// mailbox has gone is reported at send time as "Sending mailbox no longer
+/// exists". Adding the constraint would change what deleting a mailbox does,
+/// so it is deliberately a separate decision from this migration.
+model QueuedEmail {
+  id        String @id @default(uuid()) @db.Uuid
+  accountId String @db.Uuid
+
+  /// Denormalised from the account so the queue table renders without a join.
+  sendingEmail String
+  toEmail      String
+  firstName    String?
+  lastName     String?
+  company      String?
+  group        String?
+
+  subject  String
+  /// Raw body from the sheet — no signature, no unsubscribe line.
+  bodyText String
+  /// Set only when the import supplied HTML; otherwise derived at send time.
+  bodyHtml String?
+
+  /// Always UTC. The sheet's local time is converted at import.
+  scheduledAt DateTime
+  status      EmailStatus @default(pending)
+  attempts    Int         @default(0)
+  lastError   String?
+  sentAt      DateTime?
+
+  providerMessageId String?
+
+  /// When the poller moved this row to `sending`. The reaper uses it to find
+  /// rows orphaned by a worker that died mid-flight.
+  claimedAt DateTime?
+
+  /// First engagement of each kind, copied off the event log. The queue table
+  /// sorts and filters on these; the log stays the record of what happened.
+  firstOpenAt  DateTime?
+  firstClickAt DateTime?
+
+  /// (mailbox, recipient, subject, group) — deliberately not the send time, so
+  /// re-importing a sheet with a corrected schedule does not mail twice.
+  ///
+  /// Uniqueness is enforced by a *partial* index that excludes cancelled rows
+  /// (see the migration), which is why there is no @unique here. Cancelling
+  /// a message is how an operator says they did not mean to send it; if the
+  /// cancelled row kept the key reserved, re-importing the corrected sheet
+  /// would silently skip the very row they were trying to fix.
+  dedupeKey     String
+  importBatchId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// The poller's hot path: the oldest `pending` row that is already due.
+  @@index([status, scheduledAt])
+  /// The reaper's sweep over stale claims.
+  @@index([status, claimedAt])
+  /// Dashboard filters land on mailbox + status, usually newest first.
+  @@index([accountId, status, scheduledAt(sort: Desc)])
+  @@index([toEmail])
+  @@index([group])
+  @@index([importBatchId])
+  /// Declared so `migrate dev` stops dropping it as drift. The *partial* unique
+  /// index that does the real work lives in the migration, invisible to Prisma
+  /// — which is the only reason it survives a drift check at all.
+  @@index([dedupeKey])
+  @@map("email_queue")
+}
+
+/// One open or click, exactly as it arrived.
+///
+/// Nothing is filtered on the way in. Every hit is stored with the evidence
+/// that would let us judge it — how long after the send, what claimed to be
+/// asking, where from — and whether it counts is decided at read time against
+/// thresholds that live in settings. That is what makes the bot filter
+/// fixable: a better rule next month re-scores every event we already hold,
+/// where discarding at write time would have thrown the evidence away.
+model EmailEvent {
+  id      String         @id @default(uuid()) @db.Uuid
+  emailId String         @db.Uuid
+  kind    EmailEventKind
+
+  /// Destination of a click. Null for an open.
+  url String?
+
+  /// Seconds between the message being sent and this hit. The primary signal,
+  /// stored rather than compared, so the cut-off stays a setting.
+  delaySeconds Int
+
+  /// How many distinct links from this message were hit in the seconds around
+  /// this one. A scanner fetches every URL in a message; a person clicks one.
+  /// Counted here because it is only knowable at the moment of the hit — but it
+  /// is still evidence, not a verdict, so the threshold stays a read-time
+  /// setting like the others.
+  burstSize Int @default(1)
+
+  /// Raw and unparsed. Parsing rules change; the evidence should not.
+  userAgent String?
+  ip        String?
+  /// Reverse DNS of the ip, resolved once here rather than on every read.
+  ptr       String?
+
+  occurredAt DateTime @default(now())
+
+  /// The reports' shared access path.
+  @@index([emailId, kind])
+  /// Feeds the delay histogram that sets the cut-off.
+  @@index([kind, delaySeconds])
+  @@index([occurredAt(sort: Desc)])
+  @@map("email_event")
+}
+
+/// Addresses that must never be contacted again. Import rejects them and the
+/// send worker re-checks at send time, because an address can land here between
+/// the import and the scheduled send.
+model Suppression {
+  id     String            @id @default(uuid()) @db.Uuid
+  email  String            @unique
+  reason SuppressionReason
+  note   String?
+  /// Email whose bounce or unsubscribe put this address here, when known.
+  sourceEmailId String?
+  createdAt     DateTime   @default(now())
+
+  @@map("suppression")
+}
+
+/// Append-only record of who changed a mailbox, ran an import, or bulk-cancelled
+/// a campaign. Nothing in the API updates or deletes these.
+model AuditEntry {
+  id         String   @id @default(uuid()) @db.Uuid
+  actorEmail String
+  /// Dotted verb, e.g. `account.update`, `import.run`, `email.bulk_cancel`.
+  action     String
+  /// Id or address the action applied to, when there is a single one.
+  target     String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([action])
+  @@index([createdAt(sort: Desc)])
+  @@map("audit_log")
+}
