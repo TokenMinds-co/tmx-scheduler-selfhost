@@ -1,0 +1,249 @@
+name: Backend CI/CD
+
+# Path-scoped, because this is a monorepo and the frontend deploys separately.
+# A frontend-only or docs-only push should not rebuild and redeploy the API.
+# `backend/**` covers the Dockerfile and both compose files, which live there.
+on:
+  push:
+    branches: [main]
+    # Kept in sync by hand with the pull_request list below — GitHub's workflow
+    # parser does not resolve YAML anchors, so the duplication is unavoidable.
+    paths:
+      - "backend/**"
+      - "packages/shared/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - ".dockerignore"
+      - ".github/workflows/backend.yml"
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+    paths:
+      - "backend/**"
+      - "packages/shared/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - ".dockerignore"
+      - ".github/workflows/backend.yml"
+  # Escape hatch: redeploy the current main without an empty commit.
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: tmx-scheduler-backend
+
+# One deploy at a time. Two overlapping pushes to main would otherwise race on
+# `compose up` and could leave the server running the older image.
+# cancel-in-progress is off on purpose: cancelling mid-deploy is worse than
+# queueing.
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # -------------------------------------------------------------------------
+  # Pull requests: prove it compiles and the unit tests pass. No image, no
+  # deploy.
+  # -------------------------------------------------------------------------
+  build-check:
+    name: Build Check
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # No version here: the action reads `packageManager` from the root
+      # package.json, so CI, the Dockerfile (via corepack) and every developer
+      # run the same pnpm.
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      # The backend's postinstall runs `prisma generate`, so the client exists
+      # before the type check without a separate step.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --filter backend...
+
+      # Before anything else: the backend imports @ims/shared through its
+      # dist/, which does not exist until this runs.
+      - name: Build shared contracts
+        run: pnpm --filter @ims/shared build
+
+      - name: Type check
+        run: pnpm --filter backend typecheck
+
+      - name: Unit tests
+        run: pnpm --filter backend test
+
+      - name: Build
+        run: pnpm --filter backend build
+
+  # -------------------------------------------------------------------------
+  # main: build the image and push it to GHCR.
+  # -------------------------------------------------------------------------
+  build-and-push:
+    name: Build & Push Image
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.image.outputs.image }}
+      image_tag: ${{ steps.sha.outputs.short_sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve commit SHA
+        id: sha
+        run: echo "short_sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      # GHCR rejects uppercase in a path, and GitHub org names are not
+      # lowercased for us (TokenMinds-co).
+      - name: Lowercase repository owner
+        id: owner
+        run: echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve image name
+        id: image
+        run: echo "image=${{ env.REGISTRY }}/${{ steps.owner.outputs.owner }}/${{ env.IMAGE_NAME }}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image.outputs.image }}
+          # Two tags: the immutable <short-sha> the deploy pins to, and a
+          # moving pointer for anything that just wants "current".
+          tags: |
+            type=sha,prefix=,format=short
+            type=raw,value=production-latest
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./backend/Dockerfile
+          # The VPS is x86; the runner is too, so this is a native build.
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            COMMIT_SHA=${{ steps.sha.outputs.short_sha }}
+
+  # -------------------------------------------------------------------------
+  # main: pull the image on the server, restart the stack, verify it answers.
+  # -------------------------------------------------------------------------
+  deploy:
+    name: Deploy to Server
+    if: github.event_name != 'pull_request'
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH deploy
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_STAGING_HOST }}
+          username: ${{ secrets.VPS_STAGING_USER }}
+          key: ${{ secrets.VPS_STAGING_KEY }}
+          command_timeout: 15m
+          envs: DEPLOY_PATH,DEPLOY_REF,REGISTRY,IMAGE_FULL,IMAGE_TAG,GHCR_ACTOR,GHCR_TOKEN,COMPOSE_FILE
+          script: |
+            set -e
+            cd "$DEPLOY_PATH"
+
+            # Match the server's tree to the ref that triggered this run rather
+            # than trusting whatever branch it had checked out. Only the compose
+            # file and .env are read from here — the app itself comes from the
+            # image — but a stale compose file is still a stale deploy.
+            # -f discards local edits; .env is gitignored so it survives.
+            git fetch origin --prune
+            git checkout -f -B "$DEPLOY_REF" "origin/$DEPLOY_REF"
+            git reset --hard "origin/$DEPLOY_REF"
+
+            echo "$GHCR_TOKEN" | docker login "$REGISTRY" -u "$GHCR_ACTOR" --password-stdin
+
+            echo "[deploy] pulling $IMAGE_FULL:$IMAGE_TAG"
+            docker pull "$IMAGE_FULL:$IMAGE_TAG"
+
+            # `up -d` alone recreates only what changed, so Redis keeps its
+            # volume and its uptime while the backend is replaced.
+            IMAGE_NAME="$IMAGE_FULL" IMAGE_TAG="$IMAGE_TAG" \
+              docker compose -f "$COMPOSE_FILE" up -d --remove-orphans
+
+            # Smoke test from inside the container, so the check does not need
+            # to know which host port the compose file published. /health
+            # answers 503 until migrations finish and Postgres is reachable,
+            # which is what this loop waits out.
+            echo "[deploy] waiting for the backend to report healthy"
+            rm -f /tmp/tmx-health.json
+            for i in $(seq 1 40); do
+              if docker compose -f "$COMPOSE_FILE" exec -T backend \
+                   wget -qO- http://127.0.0.1:4000/health \
+                   > /tmp/tmx-health.json 2>/dev/null; then
+                break
+              fi
+              sleep 3
+            done
+
+            echo "[deploy] health: $(cat /tmp/tmx-health.json 2>/dev/null || echo '<no response>')"
+
+            if ! grep -q '"status":"ok"' /tmp/tmx-health.json 2>/dev/null; then
+              echo "[deploy] FAILED: backend never became ready"
+              docker compose -f "$COMPOSE_FILE" logs --tail=100 backend
+              exit 1
+            fi
+
+            # The image reports its own COMMIT_SHA. Without this a deploy that
+            # silently kept the old container would still report success.
+            if ! grep -q "\"version\":\"$IMAGE_TAG\"" /tmp/tmx-health.json; then
+              echo "[deploy] FAILED: serving a build other than $IMAGE_TAG"
+              exit 1
+            fi
+
+            # Every deploy tags a distinct <short-sha>, so old images stay
+            # tagged and `docker image prune` (dangling-only) never reclaims
+            # them — they just accumulate until the disk fills. Drop the ones
+            # nothing is running now that the new container is confirmed up.
+            docker images --filter "reference=$IMAGE_FULL:*" --format '{{.Repository}}:{{.Tag}}' \
+              | grep -v -x "$IMAGE_FULL:$IMAGE_TAG" \
+              | xargs -r docker rmi -f || true
+            docker image prune -f
+
+            echo "[deploy] done: $IMAGE_FULL:$IMAGE_TAG"
+        env:
+          # Path on the server holding the repo clone (compose file + .env).
+          DEPLOY_PATH: "tmx-scheduler"
+          COMPOSE_FILE: backend/docker-compose-production.yml
+          # head_ref is set only on pull_request events and holds the real
+          # source branch; ref_name there would be "<PR-number>/merge", which
+          # the server cannot check out. Correct on every trigger this job can
+          # run under, so it is safe even if deploys are ever opened to PRs.
+          DEPLOY_REF: ${{ github.head_ref || github.ref_name }}
+          REGISTRY: ${{ env.REGISTRY }}
+          IMAGE_FULL: ${{ needs.build-and-push.outputs.image }}
+          IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
+          GHCR_ACTOR: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}

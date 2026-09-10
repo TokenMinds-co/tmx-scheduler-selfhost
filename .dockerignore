@@ -1,0 +1,54 @@
+# Docker only reads the .dockerignore at the *context* root, and the backend
+# image is built with the workspace root as context (it needs pnpm-lock.yaml
+# and packages/shared). So this one file covers every image in the repo.
+
+# Dependencies — reinstalled inside the image from the lockfile. Copying the
+# host's node_modules would also drag in win32/darwin native binaries that
+# cannot run on the linux/amd64 base.
+node_modules
+**/node_modules
+
+# Build output — the builder stage produces its own.
+dist
+build
+**/dist
+**/.next
+**/out
+*.tsbuildinfo
+**/*.tsbuildinfo
+
+# Secrets. Real values reach the container through env_file/`environment`,
+# never through a layer. Examples stay out too — nothing reads them at runtime.
+.env
+.env.*
+**/.env
+**/.env.*
+
+# The frontend is never built into the backend image. Only its manifest is
+# needed, so pnpm can resolve the workspace graph.
+frontend/**
+!frontend/package.json
+
+# VCS and CI
+.git
+.gitignore
+.github
+
+# Docs, tooling, editor cruft
+*.md
+**/*.md
+scripts
+.claude
+.agents
+.DS_Store
+**/.DS_Store
+*.pem
+*.log
+coverage
+
+# Docker's own files — changing a compose file should not bust the build cache.
+# The ** matters: these live in backend/, not at the context root, and an
+# unanchored pattern would match nothing.
+.dockerignore
+**/Dockerfile
+**/docker-compose*.yml
