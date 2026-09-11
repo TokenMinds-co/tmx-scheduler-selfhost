@@ -59,7 +59,12 @@ export function sanitizeSignatureHtml(html: string): string {
       '*': {
         color: COLOUR,
         'background-color': COLOUR,
-        'font-size': [/^\d+(px|pt|em|%)$/],
+        // Keywords too: `small` is the size the signature templates use, to
+        // match the message body.
+        'font-size': [
+          /^\d+(px|pt|em|%)$/,
+          /^(xx-small|x-small|small|medium|large|x-large|xx-large)$/,
+        ],
         'font-family': [/^[\w\s,'"-]+$/],
         'font-weight': [/^(normal|bold|\d{3})$/],
         'font-style': [/^(normal|italic)$/],

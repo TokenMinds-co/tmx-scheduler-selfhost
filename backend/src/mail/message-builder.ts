@@ -141,9 +141,13 @@ export class MessageBuilder {
         )}" width="1" height="1" alt="" style="display:block;border:0" />`
       : '';
 
+    // Gmail's own compose font (`small/1.5 Arial,Helvetica,sans-serif`), so a
+    // campaign reads like mail a person typed rather than a template. Written
+    // as longhand: Outlook renders through Word, which is unreliable with the
+    // `font` shorthand.
     return [
       '<!doctype html><html><body style="margin:0;padding:0">',
-      `<div style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;color:#111827">`,
+      `<div style="font-family:Arial,Helvetica,sans-serif;font-size:small;line-height:1.5;color:#111827">`,
       sections.join('\n<br />\n'),
       pixel,
       '</div></body></html>',

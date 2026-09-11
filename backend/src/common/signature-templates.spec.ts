@@ -44,6 +44,15 @@ describe('signature templates', () => {
         expect(sanitizeSignatureHtml(html)).toBe(html);
       });
 
+      it('sets its text in the message body font', () => {
+        // Gmail's `small/1.5 Arial,Helvetica,sans-serif`, as longhand. Every
+        // text line carries it, the name included.
+        const font =
+          'font-family:Arial, Helvetica, sans-serif;font-size:small;line-height:1.5';
+        expect(sanitizeSignatureHtml(html)).toContain(font);
+        expect(html).not.toMatch(/font-size:(?!small|1px)/);
+      });
+
       it('keeps the details a signature exists for', () => {
         const clean = sanitizeSignatureHtml(html);
         expect(clean).toContain('Anchor Chan');

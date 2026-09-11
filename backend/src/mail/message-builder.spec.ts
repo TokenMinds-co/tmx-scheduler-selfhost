@@ -105,6 +105,20 @@ describe('personalisation', () => {
   });
 });
 
+describe('body font', () => {
+  it("uses Gmail's small/1.5 Arial, Helvetica, sans-serif", () => {
+    const output = html({
+      toEmail: 'ada@example.com',
+      subject: 'Hello',
+      bodyText: 'Hi',
+      includeUnsubscribe: false,
+    });
+    expect(output).toContain(
+      'font-family:Arial,Helvetica,sans-serif;font-size:small;line-height:1.5',
+    );
+  });
+});
+
 describe('click tracking', () => {
   const base = {
     toEmail: 'ada@example.com',
