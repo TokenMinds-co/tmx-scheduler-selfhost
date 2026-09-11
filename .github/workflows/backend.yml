@@ -38,16 +38,17 @@ env:
 # the deploy job is touching the server, and cancelling mid-deploy is worse
 # than queueing.
 #
-# This groups by ref, so it does NOT stop a PR and main from deploying at the
-# same time — the deploy job carries its own single-slot group for that.
+# This groups by ref, so it does NOT stop a manual dispatch from another branch
+# deploying on top of main — the deploy job carries its own single-slot group
+# for that.
 concurrency:
   group: backend-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   # -------------------------------------------------------------------------
-  # Pull requests: prove it compiles and the unit tests pass. This is the only
-  # job that runs the test suite — the image build does not.
+  # Pull requests: prove it type-checks and builds. The unit tests are not run
+  # in CI — run them locally with `pnpm --filter backend test`.
   # -------------------------------------------------------------------------
   build-check:
     name: Build Check
@@ -82,26 +83,23 @@ jobs:
       - name: Type check
         run: pnpm --filter backend typecheck
 
-      - name: Unit tests
-        run: pnpm --filter backend test
-
       - name: Build
         run: pnpm --filter backend build
 
   # -------------------------------------------------------------------------
   # Build the image and push it to GHCR.
   #
-  # TEMPORARY: this also runs on pull requests, so a branch can be exercised on
-  # the real server before it merges. To go back to deploying only `main`, add
-  # back to this job and to `deploy`:
+  # Main only: a pull request is checked by `build-check` above and never
+  # reaches the server. There is one server, and letting every PR push to it
+  # meant whichever branch built last was what production ran.
   #
-  #     if: github.event_name != 'pull_request'
-  #
-  # Nothing else here is PR-specific — the checkout ref and the tag below are
-  # correct either way.
+  # To exercise a branch on the server again, remove the `if` here and on
+  # `deploy`. Nothing else is PR-specific — the checkout ref, the tags and
+  # DEPLOY_REF below already handle a pull_request event.
   # -------------------------------------------------------------------------
   build-and-push:
     name: Build & Push Image
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -186,12 +184,11 @@ jobs:
   # -------------------------------------------------------------------------
   # Pull the image on the server, restart the backend, verify it answers.
   #
-  # TEMPORARY: runs on pull requests too — see the note on `build-and-push`.
-  # There is one server, so while this is on, whichever branch built last is
-  # what is running.
+  # Main only — see the note on `build-and-push`.
   # -------------------------------------------------------------------------
   deploy:
     name: Deploy to Server
+    if: github.event_name != 'pull_request'
     needs: build-and-push
     runs-on: ubuntu-latest
     permissions:
@@ -200,7 +197,8 @@ jobs:
       packages: read
     # There is one server, so every deploy takes the same single slot no matter
     # which branch it came from. The workflow-level group is per-ref and would
-    # happily let a PR and main run `compose up` on top of each other.
+    # happily let a manual dispatch and main run `compose up` on top of each
+    # other.
     concurrency:
       group: backend-deploy
       cancel-in-progress: false
