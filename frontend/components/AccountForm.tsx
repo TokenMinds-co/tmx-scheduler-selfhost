@@ -456,7 +456,7 @@ export function AccountForm({ account }: { account?: AccountDto }) {
           </Field>
           <Field
             label="Timezone"
-            hint="Decides when the daily counter rolls over."
+            hint="The daily limit renews at 9 AM in this zone, not at midnight. Messages held for the limit go out from 9 AM."
           >
             <Select
               value={form.timezone}

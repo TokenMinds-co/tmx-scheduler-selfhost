@@ -140,7 +140,7 @@ function MailboxCard({
           </span>
           <span className="flex items-center gap-1">
             <Icon className="size-3.5">{ICONS.globe}</Icon>
-            resets midnight {account.timezone}
+            resets 9 AM {account.timezone}
           </span>
         </div>
       </div>
