@@ -13,6 +13,7 @@ import { MailModule } from './mail/mail.module';
 import { AuthModule } from './auth/auth.module';
 import { AuditModule } from './audit/audit.module';
 import { AccountsModule } from './accounts/accounts.module';
+import { SignaturesModule } from './signatures/signatures.module';
 import { EmailsModule } from './emails/emails.module';
 import { SuppressionModule } from './suppression/suppression.module';
 import { SenderModule } from './sender/sender.module';
@@ -44,6 +45,7 @@ import { HealthController } from './health.controller';
     AuthModule,
     AuditModule,
     AccountsModule,
+    SignaturesModule,
     EmailsModule,
     SuppressionModule,
     SenderModule,

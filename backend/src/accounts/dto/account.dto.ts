@@ -5,6 +5,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  IsUUID,
   Max,
   MaxLength,
   Min,
@@ -77,13 +78,10 @@ export class CreateAccountDto {
   @IsString()
   oauthTenantId?: string;
 
+  /** Library signature to send with. */
   @IsOptional()
-  @IsString()
-  signatureHtml?: string;
-
-  @IsOptional()
-  @IsString()
-  signatureText?: string;
+  @IsUUID()
+  signatureId?: string | null;
 
   @IsOptional()
   @IsInt()
@@ -161,13 +159,10 @@ export class UpdateAccountDto {
   @IsString()
   oauthTenantId?: string;
 
+  /** Library signature to send with; null detaches. */
   @IsOptional()
-  @IsString()
-  signatureHtml?: string;
-
-  @IsOptional()
-  @IsString()
-  signatureText?: string;
+  @IsUUID()
+  signatureId?: string | null;
 
   @IsOptional()
   @IsInt()

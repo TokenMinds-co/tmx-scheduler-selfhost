@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useAuth } from '@/lib/auth';
-import { Icon } from './icons';
+import { ICONS, Icon } from './icons';
 import { Button, Spinner, cx } from './ui';
 
 const VERSION = 'v0.1.0';
@@ -64,6 +64,12 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
         add: { href: '/accounts/help', label: 'Add a mailbox' },
       },
       {
+        href: '/signatures',
+        label: 'Signatures',
+        icon: ICONS.signature,
+        add: { href: '/signatures/new', label: 'New signature' },
+      },
+      {
         href: '/suppression',
         label: 'Suppression',
         icon: (
@@ -96,6 +102,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
 const CRUMBS: [string, string[]][] = [
   ['/accounts/help', ['Mailboxes', 'Add a mailbox']],
   ['/accounts/new', ['Mailboxes', 'New mailbox']],
+  ['/signatures/new', ['Signatures', 'New signature']],
 ];
 
 function crumbsFor(pathname: string): string[] {

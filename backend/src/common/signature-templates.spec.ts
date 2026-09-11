@@ -5,6 +5,8 @@ import {
   renderSignatureText,
   withSignatureState,
   decodeSignatureState,
+  fillSignature,
+  SENDER_EMAIL_PLACEHOLDER,
   type SignatureFields,
 } from '@ims/shared';
 import { sanitizeSignatureHtml, htmlToText } from './html';
@@ -32,6 +34,39 @@ const FILLED: SignatureFields = {
   ctaUrl: 'https://www.youtube.com/watch?v=QDuVvj94P_A',
   accentColor: '#1d4ed8',
 };
+
+describe('sender placeholder', () => {
+  // A shared signature stores the placeholder rather than an address. It has to
+  // come through the sanitiser untouched, including inside the mailto link.
+  const html = renderSignatureHtml('photo-card', {
+    ...FILLED,
+    email: SENDER_EMAIL_PLACEHOLDER,
+  });
+
+  it('survives the server sanitiser byte for byte', () => {
+    expect(sanitizeSignatureHtml(html)).toBe(html);
+  });
+
+  it('fills in as a working mailto link', () => {
+    const filled = fillSignature(html, 'anchor@inbox.tmx.center', 'html');
+    expect(filled).toContain('href="mailto:anchor@inbox.tmx.center"');
+    expect(filled).toContain('>anchor@inbox.tmx.center</a>');
+    expect(filled).not.toContain(SENDER_EMAIL_PLACEHOLDER);
+  });
+
+  it('fills in the text half too', () => {
+    const text = renderSignatureText({ ...FILLED, email: SENDER_EMAIL_PLACEHOLDER });
+    expect(fillSignature(text, 'anchor@inbox.tmx.center', 'text')).toContain(
+      'Email: anchor@inbox.tmx.center',
+    );
+  });
+
+  it('escapes the address in the HTML half', () => {
+    expect(fillSignature(SENDER_EMAIL_PLACEHOLDER, 'a&b@x.co', 'html')).toBe(
+      'a&amp;b@x.co',
+    );
+  });
+});
 
 describe('signature templates', () => {
   for (const template of SIGNATURE_TEMPLATES) {

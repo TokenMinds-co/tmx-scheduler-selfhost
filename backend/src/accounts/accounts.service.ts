@@ -4,11 +4,11 @@ import { DateTime } from 'luxon';
 import { AccountDto, PROVIDER_PRESETS } from '@ims/shared';
 import { ApiException } from '../common/errors';
 import { CryptoService } from '../common/crypto.service';
-import { sanitizeSignatureHtml, htmlToText } from '../common/html';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAccountDto, UpdateAccountDto } from './dto/account.dto';
 import { localDate, sentTodayOf, startOfNextDay } from './daily-counter';
 import { TransportService } from './transport.service';
+import type { SendingAccount } from '../mail/message-builder';
 
 /**
  * Outcome of asking an account for permission to send one message right now.
@@ -16,7 +16,7 @@ import { TransportService } from './transport.service';
  * message to exactly that time rather than guessing.
  */
 export type SlotClaim =
-  | { ok: true; account: Account }
+  | { ok: true; account: SendingAccount }
   | {
       ok: false;
       reason: 'inactive' | 'daily_limit' | 'min_gap';
@@ -58,6 +58,7 @@ export class AccountsService {
   async list(): Promise<AccountDto[]> {
     const accounts = await this.prisma.account.findMany({
       orderBy: { email: 'asc' },
+      include: { signature: true },
     });
     return accounts.map((account) => this.toDto(account));
   }
@@ -75,8 +76,19 @@ export class AccountsService {
     });
   }
 
+  /** A mailbox with its library signature loaded — what building a message needs. */
+  async findForSending(id: string): Promise<SendingAccount> {
+    if (!UUID.test(id)) throw ApiException.notFound('Account not found.');
+    const account = await this.prisma.account.findUnique({
+      where: { id },
+      include: { signature: true },
+    });
+    if (!account) throw ApiException.notFound('Account not found.');
+    return account;
+  }
+
   async get(id: string): Promise<AccountDto> {
-    return this.toDto(await this.findOrThrow(id));
+    return this.toDto(await this.findForSending(id));
   }
 
   async create(dto: CreateAccountDto): Promise<AccountDto> {
@@ -103,8 +115,7 @@ export class AccountsService {
       oauthClientSecretEnc: null,
       oauthRefreshTokenEnc: null,
       oauthTenantId: null,
-      signatureHtml: '',
-      signatureText: '',
+      signatureId: null,
       dailyLimit: dto.dailyLimit ?? 20,
       minGapSeconds: dto.minGapSeconds ?? 45,
       timezone: this.validTimezone(dto.timezone),
@@ -118,7 +129,7 @@ export class AccountsService {
       updatedAt: new Date(),
     };
     this.applySecrets(draft, dto);
-    this.applySignature(draft, dto.signatureHtml, dto.signatureText);
+    await this.applySignatureLink(draft, dto.signatureId);
     this.assertCredentialsComplete(draft);
     this.warnOnProviderLimit(draft);
 
@@ -132,6 +143,7 @@ export class AccountsService {
     void updatedAt;
     const account = await this.prisma.account.create({
       data: { ...data, lastVerifiedAt: new Date() },
+      include: { signature: true },
     });
 
     this.logger.log(`Configured mailbox ${email}`);
@@ -158,7 +170,7 @@ export class AccountsService {
     }
     if (dto.active !== undefined) next.active = dto.active;
     this.applySecrets(next, dto);
-    this.applySignature(next, dto.signatureHtml, dto.signatureText);
+    await this.applySignatureLink(next, dto.signatureId);
 
     if (touchesConnection) {
       this.assertCredentialsComplete(next);
@@ -172,7 +184,11 @@ export class AccountsService {
     void _id;
     void createdAt;
     void updatedAt;
-    const saved = await this.prisma.account.update({ where: { id }, data });
+    const saved = await this.prisma.account.update({
+      where: { id },
+      data,
+      include: { signature: true },
+    });
     return this.toDto(saved);
   }
 
@@ -197,6 +213,7 @@ export class AccountsService {
     const saved = await this.prisma.account.update({
       where: { id },
       data: { lastVerifiedAt: new Date(), lastError: null },
+      include: { signature: true },
     });
     return this.toDto(saved);
   }
@@ -219,7 +236,10 @@ export class AccountsService {
    */
   async claimSendSlot(accountId: string): Promise<SlotClaim> {
     const account = UUID.test(accountId)
-      ? await this.prisma.account.findUnique({ where: { id: accountId } })
+      ? await this.prisma.account.findUnique({
+          where: { id: accountId },
+          include: { signature: true },
+        })
       : null;
 
     if (!account) {
@@ -258,7 +278,14 @@ export class AccountsService {
          AND ("lastSentAt" IS NULL OR "lastSentAt" <= ${gapCutoff})
       RETURNING *`;
 
-    if (claimed.length > 0) return { ok: true, account: claimed[0] };
+    // RETURNING * carries no relations; the signature loaded above is the one
+    // this send uses.
+    if (claimed.length > 0) {
+      return {
+        ok: true,
+        account: { ...claimed[0], signature: account.signature },
+      };
+    }
 
     // The claim failed; work out which of the two gates closed so the caller
     // can reschedule to a time that will actually succeed.
@@ -372,21 +399,26 @@ export class AccountsService {
     }
   }
 
-  private applySignature(
+  /**
+   * Attaches (an id), detaches (null) or leaves alone (undefined) the library
+   * signature. The signature itself is written in the library, never here.
+   */
+  private async applySignatureLink(
     account: Account,
-    html: string | undefined,
-    text: string | undefined,
-  ): void {
-    if (html !== undefined) account.signatureHtml = sanitizeSignatureHtml(html);
-    if (text !== undefined) account.signatureText = text;
-
-    // Derive the text half whenever it ends up empty against a non-empty HTML
-    // half — including when the operator explicitly cleared it. Every message
-    // is multipart, so an empty text signature is not "no signature", it is a
-    // blank sign-off shown to every plain-text reader.
-    if (!account.signatureText.trim() && account.signatureHtml.trim()) {
-      account.signatureText = htmlToText(account.signatureHtml);
+    signatureId: string | null | undefined,
+  ): Promise<void> {
+    if (signatureId === undefined) return;
+    if (signatureId === null) {
+      account.signatureId = null;
+      return;
     }
+    const exists =
+      UUID.test(signatureId) &&
+      (await this.prisma.signature.count({ where: { id: signatureId } })) > 0;
+    if (!exists) {
+      throw ApiException.badRequest('That signature no longer exists.');
+    }
+    account.signatureId = signatureId;
   }
 
   private assertCredentialsComplete(account: Account): void {
@@ -428,7 +460,7 @@ export class AccountsService {
     }
   }
 
-  toDto(account: Account): AccountDto {
+  toDto(account: SendingAccount): AccountDto {
     return {
       id: account.id,
       email: account.email,
@@ -445,8 +477,8 @@ export class AccountsService {
           account.oauthClientSecretEnc &&
           account.oauthRefreshTokenEnc,
       ),
-      signatureHtml: account.signatureHtml,
-      signatureText: account.signatureText,
+      signatureId: account.signatureId,
+      signatureName: account.signature?.name ?? null,
       dailyLimit: account.dailyLimit,
       minGapSeconds: account.minGapSeconds,
       timezone: account.timezone,

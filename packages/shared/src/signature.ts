@@ -499,6 +499,32 @@ export function withSignatureState(
   return html.replace(/^<div\b/, `<div ${STATE_ATTR}="${payload}"`);
 }
 
+// ---------------------------------------------------------------------------
+// Sender placeholders
+// ---------------------------------------------------------------------------
+
+/**
+ * Stands in for the sending mailbox's address. One library signature is shared
+ * by several mailboxes, and a typed address would show the same inbox on all of
+ * their mail — which is exactly how a copied signature ends up advertising the
+ * wrong one.
+ */
+export const SENDER_EMAIL_PLACEHOLDER = '{{senderEmail}}';
+
+/**
+ * Fills the sender placeholder. The HTML half gets the address escaped, the
+ * text half gets it raw. Used at send time and by every preview, so what an
+ * operator sees is what a recipient gets.
+ */
+export function fillSignature(
+  template: string,
+  senderEmail: string,
+  format: 'html' | 'text',
+): string {
+  const value = format === 'html' ? esc(senderEmail) : senderEmail;
+  return template.split(SENDER_EMAIL_PLACEHOLDER).join(value);
+}
+
 /** Reads the builder state back out of stored HTML. Null when hand-written. */
 export function decodeSignatureState(
   html: string,

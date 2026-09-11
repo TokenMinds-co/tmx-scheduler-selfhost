@@ -3,9 +3,22 @@ import type { SendMailOptions } from 'nodemailer';
 import { AppConfig, CONFIG } from '../config/configuration';
 import { CryptoService } from '../common/crypto.service';
 import { escapeHtml, textToHtml } from '../common/html';
+import { fillSignature } from '@ims/shared';
 import { rewriteLinks } from './link-rewrite';
 import { TrackingService } from '../tracking/tracking.service';
-import type { Account } from '@prisma/client';
+import type { Account, Signature } from '@prisma/client';
+
+/**
+ * A mailbox as the builder needs it: with its library signature loaded. The
+ * relation is required rather than optional, so a caller that forgot to
+ * include it fails to compile instead of quietly sending no signature.
+ */
+export type SendingAccount = Account & { signature: Signature | null };
+
+interface SignatureParts {
+  html: string;
+  text: string;
+}
 
 export interface MessageInput {
   toEmail: string;
@@ -43,14 +56,15 @@ export class MessageBuilder {
     private readonly tracking: TrackingService,
   ) {}
 
-  build(account: Account, input: MessageInput): SendMailOptions {
+  build(account: SendingAccount, input: MessageInput): SendMailOptions {
     const includeUnsubscribe = input.includeUnsubscribe ?? true;
     const unsubscribeUrl = includeUnsubscribe
       ? this.unsubscribeUrl(input.toEmail)
       : null;
 
-    const text = this.buildText(account, input, unsubscribeUrl);
-    const html = this.buildHtml(account, input, unsubscribeUrl);
+    const signature = this.signatureOf(account);
+    const text = this.buildText(signature, input, unsubscribeUrl);
+    const html = this.buildHtml(signature, input, unsubscribeUrl);
 
     const message: SendMailOptions = {
       from: { name: account.displayName, address: account.email },
@@ -85,14 +99,24 @@ export class MessageBuilder {
     return `${this.config.publicApiUrl}/unsubscribe?${params.toString()}`;
   }
 
+  /** The mailbox's library signature, addressed to it; empty when none is attached. */
+  private signatureOf(account: SendingAccount): SignatureParts {
+    const html = account.signature?.html ?? '';
+    const text = account.signature?.text ?? '';
+    return {
+      html: fillSignature(html, account.email, 'html'),
+      text: fillSignature(text, account.email, 'text'),
+    };
+  }
+
   private buildText(
-    account: Account,
+    signature: SignatureParts,
     input: MessageInput,
     unsubscribeUrl: string | null,
   ): string {
     const parts = [this.personalise(input.bodyText, input).trim()];
-    if (account.signatureText.trim()) {
-      parts.push(account.signatureText.trim());
+    if (signature.text.trim()) {
+      parts.push(signature.text.trim());
     }
     if (unsubscribeUrl) {
       parts.push(`Don't want these emails? Unsubscribe: ${unsubscribeUrl}`);
@@ -101,7 +125,7 @@ export class MessageBuilder {
   }
 
   private buildHtml(
-    account: Account,
+    signature: SignatureParts,
     input: MessageInput,
     unsubscribeUrl: string | null,
   ): string {
@@ -121,8 +145,8 @@ export class MessageBuilder {
       : personalised;
 
     const sections = [body];
-    if (account.signatureHtml.trim()) {
-      sections.push(account.signatureHtml);
+    if (signature.html.trim()) {
+      sections.push(signature.html);
     }
     if (unsubscribeUrl) {
       sections.push(

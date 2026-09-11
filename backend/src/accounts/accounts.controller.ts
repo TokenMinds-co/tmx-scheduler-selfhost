@@ -120,7 +120,7 @@ export class AccountsController {
     @Body() dto: SendTestEmailDto,
     @CurrentUser() actor: AuthUser,
   ) {
-    const account = await this.accounts.findOrThrow(id);
+    const account = await this.accounts.findForSending(id);
     const transporter = await this.transports.get(account);
     const info = await transporter.sendMail(
       this.messages.build(account, {

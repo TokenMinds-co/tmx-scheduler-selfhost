@@ -3,8 +3,10 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import {
   EMPTY_SIGNATURE_FIELDS,
+  SENDER_EMAIL_PLACEHOLDER,
   SIGNATURE_TEMPLATES,
   decodeSignatureState,
+  fillSignature,
   renderSignatureHtml,
   renderSignatureText,
   signatureTemplate,
@@ -13,16 +15,16 @@ import {
   type SignatureTemplateId,
 } from '@ims/shared';
 import { ICONS, Icon } from './icons';
-import { Field, Input, Textarea, cx } from './ui';
+import { Checkbox, Field, Input, Textarea, cx } from './ui';
 
 /**
- * Signature editing.
+ * Signature editing, for the signature library.
  *
  * SMTP carries no signature of its own — Gmail's lives in Gmail's compose box
- * and never reaches a message we send — so every mailbox configured here needs
- * one stored against it. That used to mean pasting hand-written email HTML into
- * a textarea, which is a specialist skill and an easy way to send a broken
- * block to a few hundred people.
+ * and never reaches a message we send — so every mailbox needs one supplied
+ * here. That used to mean pasting hand-written email HTML into a textarea,
+ * which is a specialist skill and an easy way to send a broken block to a few
+ * hundred people.
  *
  * So the default is a form: pick a layout, fill in the details, watch the
  * preview. Pasting HTML is still there for anyone whose brand team handed them
@@ -57,7 +59,7 @@ const FIELD_META: Record<keyof SignatureFields, FieldMeta> = {
     label: 'Website link text',
     placeholder: 'Leave blank to show the address',
   },
-  email: { label: 'Reply-to address', placeholder: 'anchor@mail.tmx.center' },
+  email: { label: 'Email', placeholder: 'anchor@mail.tmx.center' },
   phone: { label: 'Phone', placeholder: '+65 6123 4567' },
   address: {
     label: 'Address',
@@ -110,17 +112,24 @@ export interface SignatureValue {
   text: string;
 }
 
+/** A new signature shows the sending mailbox's own address unless told otherwise. */
+const NEW_SIGNATURE_FIELDS: SignatureFields = {
+  ...EMPTY_SIGNATURE_FIELDS,
+  email: SENDER_EMAIL_PLACEHOLDER,
+};
+
+/** Stands in for the mailbox address in a preview with no mailbox to show. */
+const SAMPLE_SENDER = 'mailbox@yourdomain.com';
+
 export function SignatureBuilder({
   value,
   onChange,
-  accountName,
-  accountEmail,
+  previewEmail,
 }: {
   value: SignatureValue;
   onChange: (next: SignatureValue) => void;
-  /** The form's own From-name and address, for the prefill button. */
-  accountName?: string;
-  accountEmail?: string;
+  /** Shown in place of the sending mailbox's address in the preview. */
+  previewEmail?: string;
 }) {
   // What is stored is HTML. A signature the builder produced carries the field
   // values that made it, so re-opening a mailbox lands back on the form; one
@@ -139,7 +148,7 @@ export function SignatureBuilder({
     saved?.templateId ?? 'photo-card',
   );
   const [fields, setFields] = useState<SignatureFields>(
-    saved?.fields ?? EMPTY_SIGNATURE_FIELDS,
+    saved?.fields ?? NEW_SIGNATURE_FIELDS,
   );
   const [showSource, setShowSource] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -165,25 +174,13 @@ export function SignatureBuilder({
     emit(id, fields);
   }
 
-  /**
-   * The name and address are already typed into the form above. Copying them on
-   * a click rather than syncing them live: a signature name is not always the
-   * From name, and silently overwriting an edited field is worse than a button.
-   */
-  const canPrefill = Boolean(
-    (accountName && accountName !== fields.fullName) ||
-      (accountEmail && accountEmail !== fields.email),
+  // The stored HTML keeps the placeholder; the preview shows what a recipient
+  // of one real mailbox would see.
+  const previewHtml = fillSignature(
+    value.html,
+    previewEmail || SAMPLE_SENDER,
+    'html',
   );
-
-  function prefill() {
-    const next = {
-      ...fields,
-      fullName: accountName || fields.fullName,
-      email: accountEmail || fields.email,
-    };
-    setFields(next);
-    emit(templateId, next);
-  }
 
   async function copyHtml() {
     await navigator.clipboard.writeText(value.html);
@@ -214,31 +211,30 @@ export function SignatureBuilder({
                       {group.label}
                     </legend>
                     <div className="grid gap-x-3 gap-y-2.5 @md/fields:grid-cols-2">
-                      {keys.map((key) => (
-                        <SignatureField
-                          key={key}
-                          meta={FIELD_META[key]}
-                          value={fields[key]}
-                          onChange={(next) => setField(key, next)}
-                        />
-                      ))}
+                      {keys.map((key) =>
+                        key === 'email' ? (
+                          <SenderEmailField
+                            key={key}
+                            value={fields.email}
+                            onChange={(next) => setField('email', next)}
+                          />
+                        ) : (
+                          <SignatureField
+                            key={key}
+                            meta={FIELD_META[key]}
+                            value={fields[key]}
+                            onChange={(next) => setField(key, next)}
+                          />
+                        ),
+                      )}
                     </div>
-                    {group.label === 'Who' && canPrefill && (
-                      <button
-                        type="button"
-                        onClick={prefill}
-                        className="mt-2 text-xs font-medium text-accent hover:underline"
-                      >
-                        Use the name and address from this mailbox
-                      </button>
-                    )}
                   </fieldset>
                 );
               })}
             </div>
 
             <Preview
-              html={value.html}
+              html={previewHtml}
               showSource={showSource}
               onToggleSource={() => setShowSource((on) => !on)}
               onCopy={() => void copyHtml()}
@@ -250,7 +246,7 @@ export function SignatureBuilder({
         <div className="grid gap-5 @3xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
           <Field
             label="Signature HTML"
-            hint="Tables and inline styles only — mail clients drop stylesheets. The server sanitises this again before it is stored."
+            hint={`Tables and inline styles only — mail clients drop stylesheets. Write ${SENDER_EMAIL_PLACEHOLDER} where the sending mailbox’s address should appear. The server sanitises this again before it is stored.`}
           >
             <Textarea
               rows={14}
@@ -265,7 +261,7 @@ export function SignatureBuilder({
             />
           </Field>
           <Preview
-            html={value.html}
+            html={previewHtml}
             showSource={false}
             onToggleSource={null}
             onCopy={() => void copyHtml()}
@@ -458,6 +454,47 @@ function SignatureField({
         onChange={(e) => onChange(e.target.value)}
       />
     </Field>
+  );
+}
+
+/**
+ * The email line. Automatic by default: a library signature is shared by
+ * several mailboxes, so a typed address would show the same inbox on all of
+ * them. Automatic stores a placeholder each send fills with its own address.
+ */
+function SenderEmailField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const automatic = value.trim() === SENDER_EMAIL_PLACEHOLDER;
+  return (
+    <div className="space-y-1.5">
+      <Field
+        label={FIELD_META.email.label}
+        hint={automatic ? 'Each mailbox shows its own address.' : undefined}
+      >
+        <Input
+          value={automatic ? '' : value}
+          disabled={automatic}
+          placeholder={
+            automatic
+              ? 'The sending mailbox’s address'
+              : FIELD_META.email.placeholder
+          }
+          onChange={(e) => onChange(e.target.value)}
+        />
+      </Field>
+      <Checkbox
+        label="Use the sending mailbox’s address"
+        checked={automatic}
+        onChange={(e) =>
+          onChange(e.target.checked ? SENDER_EMAIL_PLACEHOLDER : '')
+        }
+      />
+    </div>
   );
 }
 

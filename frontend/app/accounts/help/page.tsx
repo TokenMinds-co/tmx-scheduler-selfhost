@@ -10,10 +10,12 @@ import {
   PROVIDER_PRESETS,
   type AccountDto,
   type DomainCheck,
+  type SignatureDto,
 } from '@ims/shared';
+import useSWR from 'swr';
 import { Shell } from '@/components/Shell';
-import { SignatureBuilder } from '@/components/SignatureBuilder';
-import { api } from '@/lib/api';
+import { SIGNATURE_NONE, SignaturePicker } from '@/components/SignaturePicker';
+import { api, fetcher } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import {
   Alert,
@@ -445,8 +447,8 @@ interface Draft {
   oauthClientSecret: string;
   oauthRefreshToken: string;
   oauthTenantId: string;
-  signatureHtml: string;
-  signatureText: string;
+  /** A library signature id, or SIGNATURE_NONE. */
+  signature: string;
   dailyLimit: number;
   minGapSeconds: number;
   timezone: string;
@@ -465,8 +467,7 @@ const EMPTY_DRAFT: Draft = {
   oauthClientSecret: '',
   oauthRefreshToken: '',
   oauthTenantId: '',
-  signatureHtml: '',
-  signatureText: '',
+  signature: SIGNATURE_NONE,
   dailyLimit: DEFAULTS.dailyLimit,
   minGapSeconds: DEFAULTS.minGapSeconds,
   timezone: DEFAULTS.timezone,
@@ -512,6 +513,7 @@ export default function MailboxSetupPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [created, setCreated] = useState<AccountDto | null>(null);
   const [testState, setTestState] = useState<string | null>(null);
+  const signatures = useSWR<SignatureDto[]>('/signatures', fetcher);
 
   const provider = PROVIDERS.find((p) => p.presetId === providerId) ?? null;
   const preset = PROVIDER_PRESETS.find((p) => p.id === providerId);
@@ -588,12 +590,13 @@ export default function MailboxSetupPage() {
         smtpPort: Number(draft.smtpPort),
         smtpUser: draft.smtpUser.trim(),
         requireTls: draft.requireTls,
-        signatureHtml: draft.signatureHtml,
-        signatureText: draft.signatureText,
         dailyLimit: Number(draft.dailyLimit),
         minGapSeconds: Number(draft.minGapSeconds),
         timezone: draft.timezone.trim(),
       };
+      if (draft.signature !== SIGNATURE_NONE) {
+        payload.signatureId = draft.signature;
+      }
       if (usesOAuth) {
         payload.oauthClientId = draft.oauthClientId.trim();
         payload.oauthClientSecret = draft.oauthClientSecret.trim();
@@ -1005,27 +1008,20 @@ export default function MailboxSetupPage() {
       },
       {
         phase: 'Fill in the details',
-        title: 'Add a signature',
-        nextLabel: draft.signatureHtml.trim() ? 'Next' : 'Skip',
-        wide: true,
+        title: 'Choose a signature',
+        nextLabel: draft.signature !== SIGNATURE_NONE ? 'Next' : 'Skip',
         content: (
           <div className="space-y-3">
             <p className="text-sm leading-relaxed text-muted">
-              Appended to every message this mailbox sends, so a sheet mixing
-              three senders produces three different signatures. Optional — you
-              can add it later.
+              Appended to every message this mailbox sends. Signatures live in
+              a shared library, so one can serve several mailboxes — its email
+              line always shows the sending mailbox&rsquo;s own address.
+              Optional — you can attach one later.
             </p>
-            <SignatureBuilder
-              value={{ html: draft.signatureHtml, text: draft.signatureText }}
-              accountName={draft.displayName}
-              accountEmail={draft.email}
-              onChange={(next) =>
-                setDraft((current) => ({
-                  ...current,
-                  signatureHtml: next.html,
-                  signatureText: next.text,
-                }))
-              }
+            <SignaturePicker
+              value={draft.signature}
+              onChange={(choice) => set('signature', choice)}
+              senderEmail={draft.email}
             />
           </div>
         ),
@@ -1039,7 +1035,13 @@ export default function MailboxSetupPage() {
       ['Authentication', usesOAuth ? 'OAuth2' : 'Password'],
       ['Pace', `${draft.dailyLimit}/day, ${draft.minGapSeconds}s apart`],
       ['Day resets in', draft.timezone],
-      ['Signature', draft.signatureHtml ? 'Set' : 'None'],
+      [
+        'Signature',
+        draft.signature === SIGNATURE_NONE
+          ? 'None'
+          : (signatures.data?.find((s) => s.id === draft.signature)?.name ??
+            'Attached'),
+      ],
     ];
 
     const hint = submitError ? diagnose(submitError) : null;
