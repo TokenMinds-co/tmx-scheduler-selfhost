@@ -195,8 +195,9 @@ export interface AccountDto {
   requireTls: boolean;
   hasPassword: boolean;
   hasOAuthCredentials: boolean;
-  signatureHtml: string;
-  signatureText: string;
+  /** The library signature this mailbox sends with, if any. */
+  signatureId: string | null;
+  signatureName: string | null;
   dailyLimit: number;
   minGapSeconds: number;
   /** IANA zone that decides when this mailbox's daily counter rolls over. */
@@ -207,6 +208,18 @@ export interface AccountDto {
   lastError: string | null;
   lastVerifiedAt: string | null;
   active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** A library signature and the mailboxes sending with it. */
+export interface SignatureDto {
+  id: string;
+  name: string;
+  /** May contain `{{senderEmail}}`, filled per mailbox at send time. */
+  html: string;
+  text: string;
+  accounts: Array<{ id: string; email: string }>;
   createdAt: string;
   updatedAt: string;
 }

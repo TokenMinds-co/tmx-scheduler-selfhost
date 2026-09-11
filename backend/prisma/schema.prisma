@@ -85,8 +85,10 @@ model Account {
   /// Microsoft only: the directory the app registration lives in.
   oauthTenantId        String?
 
-  signatureHtml String @default("")
-  signatureText String @default("")
+  /// The library signature this mailbox sends with; null sends none. Restrict,
+  /// so a signature cannot be deleted out from under a mailbox mid-campaign.
+  signatureId String?    @db.Uuid
+  signature   Signature? @relation(fields: [signatureId], references: [id], onDelete: Restrict)
 
   dailyLimit    Int    @default(20)
   minGapSeconds Int    @default(45)
@@ -105,7 +107,27 @@ model Account {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([signatureId])
   @@map("accounts")
+}
+
+/// A reusable signature. Mailboxes attach to one, so editing it changes the
+/// sign-off of every attached mailbox from its next send. `{{senderEmail}}` in
+/// either half is filled with the sending mailbox's address at send time, which
+/// is what lets one signature serve several mailboxes.
+model Signature {
+  id   String @id @default(uuid()) @db.Uuid
+  /// Operator-facing only — how the signature is picked on a mailbox.
+  name String
+  html String @default("")
+  text String @default("")
+
+  accounts Account[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("signatures")
 }
 
 /// One scheduled message.

@@ -1,8 +1,7 @@
-import { MessageBuilder } from './message-builder';
+import { MessageBuilder, type SendingAccount } from './message-builder';
 import type { CryptoService } from '../common/crypto.service';
 import type { TrackingService } from '../tracking/tracking.service';
 import type { AppConfig } from '../config/configuration';
-import type { Account } from '@prisma/client';
 
 const config = {
   publicApiUrl: 'https://api.tmx.center',
@@ -14,16 +13,17 @@ const crypto = {
 } as unknown as CryptoService;
 
 const tracking = {
-  clickUrl: (emailId: string) => `https://api.tmx.center/t/c?m=${emailId}`,
+  clickUrl: (emailId: string, destination: string) =>
+    `https://api.tmx.center/t/c?m=${emailId}&u=${encodeURIComponent(destination)}`,
   openUrl: (emailId: string) => `https://api.tmx.center/t/o?m=${emailId}`,
 } as unknown as TrackingService;
 
 const account = {
   email: 'outreach@email.tmx.center',
   displayName: 'Kevin',
-  signatureHtml: '',
-  signatureText: '',
-} as Account;
+  signatureId: null,
+  signature: null,
+} as SendingAccount;
 
 const builder = new MessageBuilder(config, crypto, tracking);
 
@@ -101,5 +101,91 @@ describe('personalisation', () => {
       bodyText: 'Hi {{company}}',
     });
     expect(message.text).toContain('Bell & Co');
+  });
+});
+
+describe('signature', () => {
+  const input = {
+    toEmail: 'ada@example.com',
+    subject: 'Hello',
+    bodyText: 'Hi',
+    includeUnsubscribe: false,
+  };
+  const library = {
+    id: 'sig-1',
+    name: 'Anchor',
+    html: '<p>Email <a href="mailto:{{senderEmail}}">{{senderEmail}}</a></p>',
+    text: 'Email: {{senderEmail}}',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  it("fills in the sending mailbox's own address", () => {
+    // One signature shared by several mailboxes: each send shows its own.
+    const message = builder.build(
+      { ...account, signatureId: 'sig-1', signature: library },
+      input,
+    );
+    expect(message.html).toContain(
+      '<a href="mailto:outreach@email.tmx.center">outreach@email.tmx.center</a>',
+    );
+    expect(message.text).toContain('Email: outreach@email.tmx.center');
+    expect(message.html).not.toContain('{{senderEmail}}');
+  });
+
+  it('sends no signature when none is attached', () => {
+    const message = builder.build(account, input);
+    expect(message.text).toBe('Hi');
+    expect(message.html).not.toContain('<br />');
+  });
+});
+
+describe('body font', () => {
+  it("uses Gmail's small/1.5 Arial, Helvetica, sans-serif", () => {
+    const output = html({
+      toEmail: 'ada@example.com',
+      subject: 'Hello',
+      bodyText: 'Hi',
+      includeUnsubscribe: false,
+    });
+    expect(output).toContain(
+      'font-family:Arial,Helvetica,sans-serif;font-size:small;line-height:1.5',
+    );
+  });
+});
+
+describe('click tracking', () => {
+  const base = {
+    toEmail: 'ada@example.com',
+    subject: 'Hello',
+    includeUnsubscribe: false,
+    emailId: 'email-1',
+    track: true,
+  };
+
+  it('tracks a bare URL in a plain-text body', () => {
+    // The sheet's Message column with the HTML column left blank: the URL is
+    // only ever a link because textToHtml made it one.
+    const output = html({
+      ...base,
+      bodyText: 'Book a call: https://tokenminds.co/demo.',
+      bodyHtml: null,
+    });
+    expect(output).toContain(
+      `href="https://api.tmx.center/t/c?m=email-1&amp;u=${encodeURIComponent(
+        'https://tokenminds.co/demo',
+      )}"`,
+    );
+    expect(output).not.toContain('href="https://tokenminds.co/demo"');
+  });
+
+  it('leaves links untracked on a test send', () => {
+    const output = html({
+      ...base,
+      emailId: null,
+      bodyText: 'https://tokenminds.co',
+      bodyHtml: null,
+    });
+    expect(output).toContain('href="https://tokenminds.co"');
   });
 });

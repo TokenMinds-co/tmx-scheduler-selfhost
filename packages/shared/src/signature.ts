@@ -176,7 +176,19 @@ function isHexColor(value: string): boolean {
 // Shared pieces
 // ---------------------------------------------------------------------------
 
-const FONT = "-apple-system, Segoe UI, Helvetica, Arial, sans-serif";
+/**
+ * Matches the message body, which uses Gmail's compose font. A signature in a
+ * different face from the text above it is the first thing that makes a mail
+ * look templated.
+ */
+const FONT = 'Arial, Helvetica, sans-serif';
+
+/**
+ * Every text line of the signature: the body's `small/1.5`, as longhand
+ * because Outlook is unreliable with the `font` shorthand. The name stands out
+ * by weight, case and colour rather than by size.
+ */
+const TEXT = `font-family:${FONT};font-size:small;line-height:1.5`;
 
 const INK = '#111827';
 const MUTED = '#4b5563';
@@ -250,10 +262,10 @@ function link(href: string, label: string, accent: string): string {
  */
 const NBSP = '\u00a0';
 
-function nameBlock(r: Resolved, size: number): string {
+function nameBlock(r: Resolved): string {
   if (!r.fullName) return '';
   return (
-    `<div style="font-family:${FONT};font-size:${size}px;font-weight:bold;` +
+    `<div style="${TEXT};font-weight:bold;` +
     `color:${esc(r.accent)};letter-spacing:0.4px;text-transform:uppercase;` +
     `padding:0 0 4px 0">${esc(r.fullName)}</div>`
   );
@@ -262,7 +274,7 @@ function nameBlock(r: Resolved, size: number): string {
 function roleBlock(r: Resolved): string {
   if (!r.role) return '';
   return (
-    `<div style="font-family:${FONT};font-size:14px;color:${INK};` +
+    `<div style="${TEXT};color:${INK};` +
     `padding:0 0 8px 0">${esc(r.role)}</div>`
   );
 }
@@ -300,15 +312,13 @@ function contactBlock(r: Resolved): string {
   const parts: string[] = [];
   if (inline.length) {
     parts.push(
-      `<div style="font-family:${FONT};font-size:13px;color:${MUTED};` +
-        `line-height:20px;padding:0 0 4px 0">` +
+      `<div style="${TEXT};color:${MUTED};padding:0 0 4px 0">` +
         `${inline.join(NBSP + NBSP + NBSP)}</div>`,
     );
   }
   if (r.address) {
     parts.push(
-      `<div style="font-family:${FONT};font-size:13px;color:${MUTED};` +
-        `line-height:20px;padding:0">${esc(r.address)}</div>`,
+      `<div style="${TEXT};color:${MUTED};padding:0">${esc(r.address)}</div>`,
     );
   }
   return parts.join('');
@@ -317,8 +327,7 @@ function contactBlock(r: Resolved): string {
 function ctaBlock(r: Resolved): string {
   if (!r.cta) return '';
   return (
-    `<div style="font-family:${FONT};font-size:13px;color:${MUTED};` +
-    `line-height:20px;padding:12px 0 0 0"><b>P.s.</b> ` +
+    `<div style="${TEXT};color:${MUTED};padding:12px 0 0 0"><b>P.s.</b> ` +
     `${link(r.cta.href, r.cta.text, r.accent)}</div>`
   );
 }
@@ -346,9 +355,9 @@ function table(body: string): string {
   );
 }
 
-function detailsColumn(r: Resolved, nameSize: number): string {
+function detailsColumn(r: Resolved): string {
   return [
-    nameBlock(r, nameSize),
+    nameBlock(r),
     roleBlock(r),
     ruleBlock(),
     contactBlock(r),
@@ -370,7 +379,7 @@ function photoCard(r: Resolved): string {
 
   return table(
     `<tr>${left}<td valign="top" style="vertical-align:top;padding:0">` +
-      `${detailsColumn(r, 18)}</td></tr>`,
+      `${detailsColumn(r)}</td></tr>`,
   );
 }
 
@@ -382,7 +391,7 @@ function logoLeft(r: Resolved): string {
 
   return table(
     `<tr>${left}<td valign="top" style="vertical-align:top;padding:0">` +
-      `${detailsColumn(r, 17)}</td></tr>`,
+      `${detailsColumn(r)}</td></tr>`,
   );
 }
 
@@ -390,14 +399,14 @@ function stacked(r: Resolved): string {
   const logo = image(r.logoUrl, r.company || 'Logo', 96, '12px 0 0 0');
   return table(
     `<tr><td valign="top" style="vertical-align:top;padding:0">` +
-      `${detailsColumn(r, 17)}${logo}</td></tr>`,
+      `${detailsColumn(r)}${logo}</td></tr>`,
   );
 }
 
 function minimal(r: Resolved): string {
   return table(
     `<tr><td valign="top" style="vertical-align:top;padding:0">` +
-      `${nameBlock(r, 15)}${roleBlock(r)}${contactBlock(r)}</td></tr>`,
+      `${nameBlock(r)}${roleBlock(r)}${contactBlock(r)}</td></tr>`,
   );
 }
 
@@ -488,6 +497,32 @@ export function withSignatureState(
   if (!html) return '';
   const payload = encodeURIComponent(JSON.stringify(state));
   return html.replace(/^<div\b/, `<div ${STATE_ATTR}="${payload}"`);
+}
+
+// ---------------------------------------------------------------------------
+// Sender placeholders
+// ---------------------------------------------------------------------------
+
+/**
+ * Stands in for the sending mailbox's address. One library signature is shared
+ * by several mailboxes, and a typed address would show the same inbox on all of
+ * their mail — which is exactly how a copied signature ends up advertising the
+ * wrong one.
+ */
+export const SENDER_EMAIL_PLACEHOLDER = '{{senderEmail}}';
+
+/**
+ * Fills the sender placeholder. The HTML half gets the address escaped, the
+ * text half gets it raw. Used at send time and by every preview, so what an
+ * operator sees is what a recipient gets.
+ */
+export function fillSignature(
+  template: string,
+  senderEmail: string,
+  format: 'html' | 'text',
+): string {
+  const value = format === 'html' ? esc(senderEmail) : senderEmail;
+  return template.split(SENDER_EMAIL_PLACEHOLDER).join(value);
 }
 
 /** Reads the builder state back out of stored HTML. Null when hand-written. */

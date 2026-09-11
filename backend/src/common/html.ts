@@ -59,7 +59,12 @@ export function sanitizeSignatureHtml(html: string): string {
       '*': {
         color: COLOUR,
         'background-color': COLOUR,
-        'font-size': [/^\d+(px|pt|em|%)$/],
+        // Keywords too: `small` is the size the signature templates use, to
+        // match the message body.
+        'font-size': [
+          /^\d+(px|pt|em|%)$/,
+          /^(xx-small|x-small|small|medium|large|x-large|xx-large)$/,
+        ],
         'font-family': [/^[\w\s,'"-]+$/],
         'font-weight': [/^(normal|bold|\d{3})$/],
         'font-style': [/^(normal|italic)$/],
@@ -120,17 +125,70 @@ export function escapeHtml(text: string): string {
  * multipart message. Blank-line-separated blocks become paragraphs and single
  * newlines become `<br>`, which is what an operator typing into a spreadsheet
  * cell expects to see.
+ *
+ * Bare URLs become real anchors. Mail clients would linkify them on display
+ * anyway, but a link the client invents never passes through link rewriting —
+ * the recipient's click goes straight to the site and is never tracked.
  */
 export function textToHtml(text: string): string {
   const normalised = text.replace(/\r\n/g, '\n').trim();
   if (!normalised) return '';
   return normalised
     .split(/\n{2,}/)
-    .map(
-      (block) =>
-        `<p>${escapeHtml(block).split('\n').join('<br />')}</p>`,
-    )
+    .map((block) => `<p>${linkify(block).split('\n').join('<br />')}</p>`)
     .join('\n');
+}
+
+/**
+ * A bare URL in plain text. Ends at whitespace and at the characters that
+ * cannot appear unencoded in a URL, so `<https://x.test>` and
+ * `"https://x.test"` both stop where the reader expects.
+ */
+const BARE_URL = /https?:\/\/[^\s<>"']+/gi;
+
+/** Escapes plain text, wrapping each bare URL in an anchor. */
+function linkify(text: string): string {
+  let html = '';
+  let last = 0;
+  for (const match of text.matchAll(BARE_URL)) {
+    const start = match.index ?? 0;
+    const url = trimTrailingPunctuation(match[0]);
+    // "Visit https://." trims down to a scheme with nothing after it.
+    if (!/^https?:\/\/./i.test(url)) continue;
+    html += escapeHtml(text.slice(last, start));
+    html +=
+      `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">` +
+      `${escapeHtml(url)}</a>`;
+    last = start + url.length;
+  }
+  return html + escapeHtml(text.slice(last));
+}
+
+/**
+ * Drops punctuation that ends the sentence rather than the URL: the full stop
+ * in "see https://x.test." is not part of the address. A closing parenthesis
+ * is kept when the URL opened one itself, as Wikipedia URLs do.
+ */
+function trimTrailingPunctuation(url: string): string {
+  let end = url.length;
+  while (end > 0) {
+    const char = url[end - 1];
+    if ('.,;:!?'.includes(char)) {
+      end -= 1;
+      continue;
+    }
+    if (char === ')') {
+      const head = url.slice(0, end);
+      const opened = head.split('(').length - 1;
+      const closed = head.split(')').length - 1;
+      if (closed > opened) {
+        end -= 1;
+        continue;
+      }
+    }
+    break;
+  }
+  return url.slice(0, end);
 }
 
 /**

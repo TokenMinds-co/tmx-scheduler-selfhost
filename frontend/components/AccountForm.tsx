@@ -2,11 +2,16 @@
 
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
-import type { AccountDto, AuthType } from '@ims/shared';
+import useSWR from 'swr';
+import type { AccountDto, AuthType, SignatureDto } from '@ims/shared';
 import { AUTH_TYPES, COMMON_TIMEZONES, PROVIDER_PRESETS } from '@ims/shared';
-import { api } from '@/lib/api';
+import { api, fetcher } from '@/lib/api';
 import { ICONS, Icon } from './icons';
-import { SignatureBuilder } from './SignatureBuilder';
+import {
+  SIGNATURE_NONE,
+  SignaturePicker,
+  initialSignatureChoice,
+} from './SignaturePicker';
 import {
   AccordionSection,
   Alert,
@@ -30,8 +35,8 @@ interface FormState {
   oauthClientSecret: string;
   oauthRefreshToken: string;
   oauthTenantId: string;
-  signatureHtml: string;
-  signatureText: string;
+  /** A library signature id, or SIGNATURE_NONE. */
+  signature: string;
   dailyLimit: number;
   minGapSeconds: number;
   timezone: string;
@@ -54,8 +59,7 @@ function initialState(account?: AccountDto): FormState {
     oauthClientSecret: '',
     oauthRefreshToken: '',
     oauthTenantId: '',
-    signatureHtml: account?.signatureHtml ?? '',
-    signatureText: account?.signatureText ?? '',
+    signature: initialSignatureChoice(account),
     dailyLimit: account?.dailyLimit ?? 20,
     minGapSeconds: account?.minGapSeconds ?? 45,
     timezone: account?.timezone ?? 'Asia/Singapore',
@@ -76,6 +80,7 @@ export function AccountForm({ account }: { account?: AccountDto }) {
   // panels is the wall of fields this replaced.
   const [open, setOpen] = useState<SectionId | null>('identity');
   const formRef = useRef<HTMLFormElement>(null);
+  const signatures = useSWR<SignatureDto[]>('/signatures', fetcher);
 
   function toggle(id: SectionId) {
     setOpen((current) => (current === id ? null : id));
@@ -154,14 +159,19 @@ export function AccountForm({ account }: { account?: AccountDto }) {
       smtpPort: Number(form.smtpPort),
       smtpUser: form.smtpUser,
       requireTls: form.requireTls,
-      signatureHtml: form.signatureHtml,
-      signatureText: form.signatureText,
       dailyLimit: Number(form.dailyLimit),
       minGapSeconds: Number(form.minGapSeconds),
       timezone: form.timezone,
       active: form.active,
     };
     if (!editing) payload.email = form.email;
+
+    // Only a change is sent, so saving other settings never touches which
+    // signature the mailbox uses.
+    if (form.signature !== initialSignatureChoice(account)) {
+      payload.signatureId =
+        form.signature === SIGNATURE_NONE ? null : form.signature;
+    }
 
     for (const key of [
       'smtpPassword',
@@ -220,7 +230,11 @@ export function AccountForm({ account }: { account?: AccountDto }) {
         }`
       : 'Not configured',
     pace: `${form.dailyLimit}/day · ${form.minGapSeconds}s apart · ${form.timezone}`,
-    signature: form.signatureHtml.trim() ? 'Set' : 'None',
+    signature:
+      form.signature === SIGNATURE_NONE
+        ? 'None'
+        : (signatures.data?.find((s) => s.id === form.signature)?.name ??
+          'Library signature'),
   };
 
   return (
@@ -472,17 +486,10 @@ export function AccountForm({ account }: { account?: AccountDto }) {
         onToggle={() => toggle('signature')}
       >
         <div className="p-4">
-          <SignatureBuilder
-            value={{ html: form.signatureHtml, text: form.signatureText }}
-            accountName={form.displayName}
-            accountEmail={form.email}
-            onChange={(next) =>
-              setForm((current) => ({
-                ...current,
-                signatureHtml: next.html,
-                signatureText: next.text,
-              }))
-            }
+          <SignaturePicker
+            value={form.signature}
+            onChange={(choice) => set('signature', choice)}
+            senderEmail={form.email}
           />
         </div>
       </AccordionSection>
