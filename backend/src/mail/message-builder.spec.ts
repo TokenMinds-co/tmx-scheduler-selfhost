@@ -14,7 +14,8 @@ const crypto = {
 } as unknown as CryptoService;
 
 const tracking = {
-  clickUrl: (emailId: string) => `https://api.tmx.center/t/c?m=${emailId}`,
+  clickUrl: (emailId: string, destination: string) =>
+    `https://api.tmx.center/t/c?m=${emailId}&u=${encodeURIComponent(destination)}`,
   openUrl: (emailId: string) => `https://api.tmx.center/t/o?m=${emailId}`,
 } as unknown as TrackingService;
 
@@ -101,5 +102,41 @@ describe('personalisation', () => {
       bodyText: 'Hi {{company}}',
     });
     expect(message.text).toContain('Bell & Co');
+  });
+});
+
+describe('click tracking', () => {
+  const base = {
+    toEmail: 'ada@example.com',
+    subject: 'Hello',
+    includeUnsubscribe: false,
+    emailId: 'email-1',
+    track: true,
+  };
+
+  it('tracks a bare URL in a plain-text body', () => {
+    // The sheet's Message column with the HTML column left blank: the URL is
+    // only ever a link because textToHtml made it one.
+    const output = html({
+      ...base,
+      bodyText: 'Book a call: https://tokenminds.co/demo.',
+      bodyHtml: null,
+    });
+    expect(output).toContain(
+      `href="https://api.tmx.center/t/c?m=email-1&amp;u=${encodeURIComponent(
+        'https://tokenminds.co/demo',
+      )}"`,
+    );
+    expect(output).not.toContain('href="https://tokenminds.co/demo"');
+  });
+
+  it('leaves links untracked on a test send', () => {
+    const output = html({
+      ...base,
+      emailId: null,
+      bodyText: 'https://tokenminds.co',
+      bodyHtml: null,
+    });
+    expect(output).toContain('href="https://tokenminds.co"');
   });
 });
