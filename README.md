@@ -116,7 +116,7 @@ correct preview and the recipient gets the layout stripped out.
 | 5xx naming the recipient (550/551/553) | Hard bounce → address suppressed, remaining mail to it cancelled. |
 | 5xx about quota or rate | Treated as transient — the mailbox is over quota, not wrong. |
 | Connection error (no SMTP reply) | Transient, and the daily slot is given back: nothing was sent. |
-| Daily limit reached | Deferred to the next local day. Not an attempt. |
+| Daily limit reached | Deferred to 9 AM the next send day, in the mailbox's zone. Not an attempt. |
 | Pacing gap not open | Deferred to when it opens, plus jitter. Not an attempt. |
 
 ## Import format

@@ -990,7 +990,7 @@ export default function MailboxSetupPage() {
                   onChange={(e) => set('minGapSeconds', Number(e.target.value))}
                 />
               </Field>
-              <Field label="Timezone" hint="When the daily counter resets.">
+              <Field label="Timezone" hint="The daily limit renews at 9 AM in this zone, not at midnight.">
                 <Select
                   value={draft.timezone}
                   onChange={(e) => set('timezone', e.target.value)}
