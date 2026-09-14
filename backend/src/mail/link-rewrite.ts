@@ -11,15 +11,18 @@ import { escapeHtml } from '../common/html';
  * Only `http` and `https` are rewritten. `mailto:` and `tel:` are actions
  * rather than destinations and a redirect through us would break both;
  * fragments and relative URLs have no meaning outside the page they came from.
+ *
+ * `toTrackingUrl` may return null to leave a particular link as it is.
  */
 export function rewriteLinks(
   html: string,
-  toTrackingUrl: (destination: string) => string,
+  toTrackingUrl: (destination: string) => string | null,
 ): string {
   return html.replace(/href="([^"]*)"/gi, (whole, raw: string) => {
     const destination = decodeAttribute(raw);
     if (!/^https?:\/\//i.test(destination)) return whole;
-    return `href="${escapeHtml(toTrackingUrl(destination))}"`;
+    const tracked = toTrackingUrl(destination);
+    return tracked ? `href="${escapeHtml(tracked)}"` : whole;
   });
 }
 
