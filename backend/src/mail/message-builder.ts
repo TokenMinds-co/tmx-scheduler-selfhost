@@ -3,7 +3,11 @@ import type { SendMailOptions } from 'nodemailer';
 import { AppConfig, CONFIG } from '../config/configuration';
 import { CryptoService } from '../common/crypto.service';
 import { escapeHtml, textToHtml } from '../common/html';
-import { fillSignature } from '@ims/shared';
+import {
+  decodeSignatureState,
+  fillSignature,
+  normaliseSignatureUrl,
+} from '@ims/shared';
 import { rewriteLinks } from './link-rewrite';
 import { TrackingService } from '../tracking/tracking.service';
 import type { Account, Signature } from '@prisma/client';
@@ -37,7 +41,7 @@ export interface MessageInput {
    * nothing to attribute the hit to.
    */
   emailId?: string | null;
-  /** Rewrite body links and append the open pixel. */
+  /** Rewrite body links and the signature's P.s. link, and append the open pixel. */
   track?: boolean;
 }
 
@@ -109,6 +113,29 @@ export class MessageBuilder {
     };
   }
 
+  /**
+   * Tracks the signature's P.s. link and only that one.
+   *
+   * The P.s. is the call to action — a click on it is campaign engagement in
+   * the same way a body link is. The rest of the signature stays as written:
+   * its website link displays an address, and pointing text that reads as one
+   * site at a tracking host is the "says one domain, goes to another" pattern
+   * spam filters score against.
+   *
+   * The P.s. is found by the address the builder stored with the signature
+   * rather than by its markup, so any template works and a signature saved
+   * before this existed needs no re-saving. Pasted HTML carries no such record
+   * and is left entirely alone.
+   */
+  private trackCallToAction(html: string, emailId: string): string {
+    const ctaUrl = decodeSignatureState(html)?.fields.ctaUrl ?? '';
+    const destination = normaliseSignatureUrl(ctaUrl);
+    if (!/^https?:\/\//i.test(destination)) return html;
+    return rewriteLinks(html, (url) =>
+      url === destination ? this.tracking.clickUrl(emailId, url) : null,
+    );
+  }
+
   private buildText(
     signature: SignatureParts,
     input: MessageInput,
@@ -133,10 +160,9 @@ export class MessageBuilder {
       ? this.personalise(input.bodyHtml, input, true)
       : textToHtml(this.personalise(input.bodyText, input));
 
-    // Only the body is rewritten. The signature's links are the company's own
-    // and a click on a logo is not campaign engagement; the unsubscribe link
-    // must stay untouched or the RFC 8058 one-click header stops matching the
-    // link beside it.
+    // The body and the signature's P.s. link are rewritten, nothing else. The
+    // unsubscribe link must stay untouched or the RFC 8058 one-click header
+    // stops matching the link beside it.
     const trackable = input.track && input.emailId;
     const body = trackable
       ? rewriteLinks(personalised, (destination) =>
@@ -146,7 +172,11 @@ export class MessageBuilder {
 
     const sections = [body];
     if (signature.html.trim()) {
-      sections.push(signature.html);
+      sections.push(
+        trackable
+          ? this.trackCallToAction(signature.html, input.emailId as string)
+          : signature.html,
+      );
     }
     if (unsubscribeUrl) {
       sections.push(

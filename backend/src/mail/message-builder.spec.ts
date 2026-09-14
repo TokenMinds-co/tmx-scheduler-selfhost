@@ -1,3 +1,8 @@
+import {
+  EMPTY_SIGNATURE_FIELDS,
+  renderSignatureHtml,
+  withSignatureState,
+} from '@ims/shared';
 import { MessageBuilder, type SendingAccount } from './message-builder';
 import type { CryptoService } from '../common/crypto.service';
 import type { TrackingService } from '../tracking/tracking.service';
@@ -187,5 +192,63 @@ describe('click tracking', () => {
       bodyHtml: null,
     });
     expect(output).toContain('href="https://tokenminds.co"');
+  });
+});
+
+describe('signature P.s. link', () => {
+  const fields = {
+    ...EMPTY_SIGNATURE_FIELDS,
+    fullName: 'Anchor Chan',
+    websiteUrl: 'https://www.visibility.tokenminds.co/',
+    email: '{{senderEmail}}',
+    ctaText: 'See the full video',
+    // An ampersand, so the attribute's &amp; has to be decoded to match.
+    ctaUrl: 'https://www.youtube.com/watch?v=QDuVvj94P_A&t=5',
+  };
+  const sender: SendingAccount = {
+    ...account,
+    signatureId: 'sig-1',
+    signature: {
+      id: 'sig-1',
+      name: 'Anchor',
+      html: withSignatureState(renderSignatureHtml('minimal', fields), {
+        templateId: 'minimal',
+        fields,
+      }),
+      text: 'Anchor Chan',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+  };
+  const input = {
+    toEmail: 'ada@example.com',
+    subject: 'Hello',
+    bodyText: 'Hi',
+    includeUnsubscribe: false,
+  };
+  const tracked = () =>
+    builder.build(sender, { ...input, emailId: 'email-1', track: true })
+      .html as string;
+
+  it('is tracked like a body link', () => {
+    expect(tracked()).toContain(
+      `href="https://api.tmx.center/t/c?m=email-1&amp;u=${encodeURIComponent(
+        fields.ctaUrl,
+      )}"`,
+    );
+  });
+
+  it('leaves the rest of the signature untracked', () => {
+    const output = tracked();
+    expect(output).toContain('href="https://www.visibility.tokenminds.co/"');
+    expect(output).toContain('href="mailto:outreach@email.tmx.center"');
+  });
+
+  it('is not tracked on a test send', () => {
+    const output = builder.build(sender, input).html as string;
+    expect(output).toContain(
+      'href="https://www.youtube.com/watch?v=QDuVvj94P_A&amp;t=5"',
+    );
+    expect(output).not.toContain('/t/c?');
   });
 });
