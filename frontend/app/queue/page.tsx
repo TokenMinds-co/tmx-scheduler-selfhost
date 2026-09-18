@@ -102,6 +102,54 @@ function Engagement({ email }: { email: EmailDto }) {
 }
 
 /**
+ * What the mailbox table says when it is closed.
+ *
+ * Capacity across every mailbox as one bar, and anything that would make
+ * someone open it — mail waiting, sends that failed — called out by name.
+ */
+function MailboxSummary({ rows }: { rows: AccountStats[] | undefined }) {
+  if (!rows) {
+    return <div className="h-12 animate-pulse bg-canvas/60" aria-hidden />;
+  }
+
+  const sent = rows.reduce((n, row) => n + row.sentToday, 0);
+  const capacity = rows.reduce((n, row) => n + row.dailyLimit, 0);
+  const pending = rows.reduce((n, row) => n + row.pending, 0);
+  const failed = rows.reduce((n, row) => n + row.failed, 0);
+  const paused = rows.filter((row) => !row.active).length;
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 text-sm">
+      <div className="flex items-center gap-3">
+        <div className="w-28">
+          <Meter value={sent} max={capacity} tone={sent >= capacity ? 'full' : 'accent'} />
+        </div>
+        <span className="tabular-nums">
+          {sent.toLocaleString()} / {capacity.toLocaleString()}
+        </span>
+        <span className="text-muted">sent today</span>
+      </div>
+
+      <span className="text-muted">
+        {plural(rows.length, 'mailbox', 'mailboxes')}
+        {paused > 0 && <> · {paused} paused</>}
+      </span>
+
+      {pending > 0 && (
+        <span className="text-muted">
+          {plural(pending, 'message')} waiting
+        </span>
+      )}
+      {failed > 0 && (
+        <span className="font-medium text-failed">
+          {plural(failed, 'failure')}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
  * `?batch=<id>` is how the batch list drills in here, so the filter is read
  * from the URL as well as from the dropdown — which also makes a filtered
  * queue a link somebody can send.
@@ -113,6 +161,10 @@ function QueueView() {
     batchId: batchParam,
   });
   const [page, setPage] = useState(1);
+  // Collapsed by default. Mailbox capacity is a glance-and-forget number, and
+  // expanded it pushed the queue itself — the reason the page exists — below
+  // the fold on a laptop. The summary keeps what would make someone look.
+  const [mailboxesOpen, setMailboxesOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -345,8 +397,25 @@ function QueueView() {
       </div>
 
       {/* Per-mailbox capacity */}
-      <Card title="Mailboxes today" className="mb-6">
-        <div className="table-scroll">
+      <Card
+        title="Mailboxes today"
+        className="mb-6"
+        actions={
+          <Button variant="ghost" onClick={() => setMailboxesOpen((o) => !o)}>
+            {mailboxesOpen ? 'Hide' : 'Show'}
+            <Icon
+              className={cx(
+                'size-3.5 transition-transform',
+                mailboxesOpen && 'rotate-180',
+              )}
+            >
+              {ICONS.chevron}
+            </Icon>
+          </Button>
+        }
+      >
+        {!mailboxesOpen && <MailboxSummary rows={accountStats.data} />}
+        <div hidden={!mailboxesOpen} className="table-scroll table-scroll-wide">
           <table className="data-table">
             <thead>
               <tr>
@@ -427,17 +496,20 @@ function QueueView() {
           </table>
         </div>
 
-        <Pagination
-          page={mailboxRows.page}
-          pageSize={mailboxRows.pageSize}
-          total={mailboxRows.total}
-          onPage={mailboxRows.setPage}
-        />
+        {mailboxesOpen && (
+          <Pagination
+            page={mailboxRows.page}
+            pageSize={mailboxRows.pageSize}
+            total={mailboxRows.total}
+            onPage={mailboxRows.setPage}
+          />
+        )}
       </Card>
 
       {/* Filters */}
       <Card className="mb-4">
         <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="lg:col-span-2">
           <Field label="Search recipient, company or subject">
             <div className="relative">
               <Icon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted">
@@ -451,6 +523,7 @@ function QueueView() {
               />
             </div>
           </Field>
+          </div>
           <Field label="Mailbox">
             <Select
               value={filters.accountId}
@@ -490,44 +563,52 @@ function QueueView() {
               ))}
             </Select>
           </Field>
-          <Field label="Status">
-            <div className="flex flex-wrap gap-1 pt-0.5">
-              {EMAIL_STATUSES.map((status) => (
-                <button
-                  key={status}
-                  type="button"
-                  aria-pressed={filters.status.includes(status)}
-                  onClick={() => toggleStatus(status)}
-                  className={cx(
-                    'rounded-full border px-2 py-0.5 text-xs capitalize transition',
-                    filters.status.includes(status)
-                      ? 'border-accent bg-accent-soft font-medium text-accent'
-                      : 'border-border text-muted hover:text-ink',
-                  )}
-                >
-                  {status}
-                </button>
-              ))}
-            </div>
-          </Field>
         </div>
-        {filtersActive && (
-          <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-2 text-xs text-muted">
-            <span>
-              Showing{' '}
-              {emails.data ? plural(emails.data.total, 'match', 'matches') : '…'}
+
+        {/* Status is a row of toggles, not a form field, and it shares its line
+            with the count so the filter bar ends on what it selected. */}
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-border px-4 py-2">
+          <div className="flex flex-wrap items-center gap-1">
+            <span className="mr-1 text-xs font-medium uppercase tracking-wide text-muted">
+              Status
             </span>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setFilters(EMPTY_FILTERS);
-                setPage(1);
-              }}
-            >
-              Clear filters
-            </Button>
+            {EMAIL_STATUSES.map((status) => (
+              <button
+                key={status}
+                type="button"
+                aria-pressed={filters.status.includes(status)}
+                onClick={() => toggleStatus(status)}
+                className={cx(
+                  'rounded-full border px-2 py-0.5 text-xs capitalize transition',
+                  filters.status.includes(status)
+                    ? 'border-accent bg-accent-soft font-medium text-accent'
+                    : 'border-border text-muted hover:text-ink',
+                )}
+              >
+                {status}
+              </button>
+            ))}
           </div>
-        )}
+          {filtersActive && (
+            <div className="flex items-center gap-2 text-xs text-muted">
+              <span>
+                Showing{' '}
+                {emails.data
+                  ? plural(emails.data.total, 'match', 'matches')
+                  : '…'}
+              </span>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setFilters(EMPTY_FILTERS);
+                  setPage(1);
+                }}
+              >
+                Clear filters
+              </Button>
+            </div>
+          )}
+        </div>
       </Card>
 
       {/* Queue table */}
@@ -554,35 +635,76 @@ function QueueView() {
               <tr>
                 <th>Scheduled</th>
                 <th>Recipient</th>
-                <th>Subject</th>
-                <th>From</th>
-                <th>Group</th>
+                <th>Sent from</th>
                 <th>Status</th>
-                <th>Engagement</th>
                 <th className="text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {!emails.data && <LoadingRows columns={8} rows={5} />}
+              {!emails.data && <LoadingRows columns={5} rows={5} />}
               {emails.data?.items.map((email) => (
                 <tr key={email.id}>
+                  {/* The zone is stated once in the page header, so every row
+                      does not have to repeat "GMT+7". */}
                   <td className="whitespace-nowrap tabular-nums">
-                    {formatDateTime(email.scheduledAt)}
-                  </td>
-                  <td>
-                    <div className="font-medium">{email.toEmail}</div>
-                    {(email.firstName || email.company) && (
+                    <div title={formatDateTime(email.scheduledAt)}>
+                      {formatShort(email.scheduledAt)}
+                    </div>
+                    {email.sentAt && (
                       <div className="text-xs text-muted">
+                        sent {formatShort(email.sentAt)}
+                      </div>
+                    )}
+                  </td>
+
+                  {/* Who it is for, then what they were sent. The subject used
+                      to have a column of its own, which on a campaign repeated
+                      the same sentence down the entire screen. */}
+                  <td className="max-w-sm">
+                    <div className="truncate font-medium">{email.toEmail}</div>
+                    {(email.firstName || email.company) && (
+                      <div className="truncate text-xs text-muted">
                         {[email.firstName, email.company]
                           .filter(Boolean)
                           .join(' · ')}
                       </div>
                     )}
-                  </td>
-                  <td className="max-w-xs">
-                    <div className="truncate" title={email.subject}>
+                    <div
+                      className="truncate text-xs text-muted"
+                      title={email.subject}
+                    >
                       {email.subject}
                     </div>
+                  </td>
+
+                  {/* Every mailbox here is anchor@<something>, so the domain is
+                      the part worth reading. */}
+                  <td className="text-xs">
+                    <div className="whitespace-nowrap">
+                      <span className="text-muted">
+                        {email.sendingEmail.split('@')[0]}@
+                      </span>
+                      {email.sendingEmail.split('@')[1]}
+                    </div>
+                    {email.group && (
+                      <span className="mt-0.5 inline-flex rounded-full bg-canvas px-1.5 py-0.5 text-xs text-muted">
+                        {email.group}
+                      </span>
+                    )}
+                  </td>
+
+                  {/* Status, what the recipient did with it, and why it failed:
+                      one story about one message, in one column. */}
+                  <td className="max-w-xs">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <StatusBadge status={email.status} />
+                      <Engagement email={email} />
+                    </div>
+                    {email.attempts > 1 && (
+                      <div className="mt-0.5 text-xs text-muted">
+                        {plural(email.attempts, 'attempt')}
+                      </div>
+                    )}
                     {email.lastError && (
                       <div
                         className="mt-0.5 truncate text-xs text-failed"
@@ -592,19 +714,7 @@ function QueueView() {
                       </div>
                     )}
                   </td>
-                  <td className="text-xs text-muted">{email.sendingEmail}</td>
-                  <td className="text-xs text-muted">{email.group ?? '—'}</td>
-                  <td>
-                    <StatusBadge status={email.status} />
-                    {email.attempts > 0 && (
-                      <div className="mt-0.5 text-xs text-muted">
-                        {plural(email.attempts, 'attempt')}
-                      </div>
-                    )}
-                  </td>
-                  <td className="whitespace-nowrap">
-                    <Engagement email={email} />
-                  </td>
+
                   <td className="whitespace-nowrap text-right">
                     <div className="flex items-center justify-end gap-0.5">
                       {email.status === 'pending' && (
@@ -633,18 +743,13 @@ function QueueView() {
                           icon={<Icon>{ICONS.refresh}</Icon>}
                         />
                       )}
-                      {email.status === 'sent' && (
-                        <span className="text-xs text-muted">
-                          {formatShort(email.sentAt)}
-                        </span>
-                      )}
                     </div>
                   </td>
                 </tr>
               ))}
               {emails.data?.items.length === 0 && (
                 <tr>
-                  <td colSpan={7}>
+                  <td colSpan={5}>
                     <EmptyState
                       title="Nothing matches"
                       description={
