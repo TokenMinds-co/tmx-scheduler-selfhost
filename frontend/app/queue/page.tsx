@@ -201,6 +201,12 @@ function QueueView() {
   const accounts = useSWR<AccountDto[]>('/accounts', fetcher);
   const groups = useSWR<string[]>('/emails/groups', fetcher);
   const batches = useSWR<BatchDto[]>('/batches', fetcher);
+  // A row carries only its batch id. The list the filter already loaded is
+  // what turns that into the number people actually say.
+  const batchById = useMemo(
+    () => new Map((batches.data ?? []).map((batch) => [batch.id, batch])),
+    [batches.data],
+  );
 
   // Arriving from the batch list, or moving between two batches without this
   // page unmounting in between.
@@ -678,7 +684,8 @@ function QueueView() {
                   </td>
 
                   {/* Every mailbox here is anchor@<something>, so the domain is
-                      the part worth reading. */}
+                      the part worth reading. Below it, where the message came
+                      from: its batch, and the group the sheet gave it. */}
                   <td className="text-xs">
                     <div className="whitespace-nowrap">
                       <span className="text-muted">
@@ -686,11 +693,31 @@ function QueueView() {
                       </span>
                       {email.sendingEmail.split('@')[1]}
                     </div>
-                    {email.group && (
-                      <span className="mt-0.5 inline-flex rounded-full bg-canvas px-1.5 py-0.5 text-xs text-muted">
-                        {email.group}
-                      </span>
-                    )}
+                    <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                      {email.batchId && (
+                        // Clicking it filters to that batch, which is the thing
+                        // anyone wants next after noticing which batch a row is
+                        // from.
+                        <button
+                          type="button"
+                          title={
+                            batchById.get(email.batchId)?.name ??
+                            'Filter to this batch'
+                          }
+                          onClick={() =>
+                            setFilter('batchId', email.batchId as string)
+                          }
+                          className="rounded-full bg-accent-soft px-1.5 py-0.5 font-medium text-accent transition hover:opacity-80"
+                        >
+                          Batch {batchById.get(email.batchId)?.number ?? '…'}
+                        </button>
+                      )}
+                      {email.group && (
+                        <span className="rounded-full bg-canvas px-1.5 py-0.5 text-muted">
+                          {email.group}
+                        </span>
+                      )}
+                    </div>
                   </td>
 
                   {/* Status, what the recipient did with it, and why it failed:
