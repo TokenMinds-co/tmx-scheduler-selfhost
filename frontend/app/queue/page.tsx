@@ -36,11 +36,13 @@ import {
   Meter,
   PageHeader,
   Pagination,
+  ROWS_PER_PAGE,
   Select,
   Spinner,
   Stat,
   StatusBadge,
   cx,
+  usePagedRows,
 } from '@/components/ui';
 
 interface Filters {
@@ -112,7 +114,7 @@ export default function QueuePage() {
     if (filters.group) params.set('group', filters.group);
     if (filters.search) params.set('search', filters.search);
     params.set('page', String(page));
-    params.set('pageSize', '50');
+    params.set('pageSize', String(ROWS_PER_PAGE));
     return params.toString();
   }, [filters, page]);
 
@@ -132,6 +134,8 @@ export default function QueuePage() {
   );
   const accounts = useSWR<AccountDto[]>('/accounts', fetcher);
   const groups = useSWR<string[]>('/emails/groups', fetcher);
+  // Every mailbox comes back in one response, so this table pages client-side.
+  const mailboxRows = usePagedRows(accountStats.data);
 
   const filtersActive =
     filters.status.length > 0 ||
@@ -332,7 +336,7 @@ export default function QueuePage() {
             </thead>
             <tbody>
               {!accountStats.data && <LoadingRows columns={6} rows={2} />}
-              {accountStats.data?.map((row) => (
+              {mailboxRows.rows?.map((row) => (
                 <tr key={row.accountId}>
                   <td>
                     <span className="font-medium">{row.email}</span>{' '}
@@ -398,6 +402,13 @@ export default function QueuePage() {
             </tbody>
           </table>
         </div>
+
+        <Pagination
+          page={mailboxRows.page}
+          pageSize={mailboxRows.pageSize}
+          total={mailboxRows.total}
+          onPage={mailboxRows.setPage}
+        />
       </Card>
 
       {/* Filters */}

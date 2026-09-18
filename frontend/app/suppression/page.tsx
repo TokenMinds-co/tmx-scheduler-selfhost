@@ -21,6 +21,7 @@ import {
   LoadingRows,
   PageHeader,
   Pagination,
+  ROWS_PER_PAGE,
   Select,
   Textarea,
 } from '@/components/ui';
@@ -47,7 +48,7 @@ export default function SuppressionPage() {
   const [busy, setBusy] = useState(false);
 
   const list = useSWR<Paginated<SuppressionDto>>(
-    `/suppression?page=${page}&pageSize=50${search ? `&search=${encodeURIComponent(search)}` : ''}`,
+    `/suppression?page=${page}&pageSize=${ROWS_PER_PAGE}${search ? `&search=${encodeURIComponent(search)}` : ''}`,
     fetcher,
     { keepPreviousData: true },
   );

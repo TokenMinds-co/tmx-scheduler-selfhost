@@ -15,9 +15,11 @@ import {
   Card,
   Field,
   PageHeader,
+  Pagination,
   Select,
   Stat,
   cx,
+  usePagedRows,
 } from '@/components/ui';
 
 /**
@@ -225,6 +227,8 @@ export default function ImportPage() {
   }
 
   const result = committed ?? preview;
+  // A bad sheet can fail hundreds of rows; they page rather than fill the screen.
+  const errorRows = usePagedRows(result?.errors);
   // The primary action moves with the workflow: check first, then queue.
   const canQueue = Boolean(preview && preview.inserted > 0 && !committed);
 
@@ -348,7 +352,7 @@ export default function ImportPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {result.errors.map((row) => (
+                        {errorRows.rows?.map((row) => (
                           <tr key={`${row.row}-${row.toEmail}`}>
                             <td className="tabular-nums">{row.row}</td>
                             <td>{row.toEmail ?? '—'}</td>
@@ -358,6 +362,13 @@ export default function ImportPage() {
                       </tbody>
                     </table>
                   </div>
+
+                  <Pagination
+                    page={errorRows.page}
+                    pageSize={errorRows.pageSize}
+                    total={errorRows.total}
+                    onPage={errorRows.setPage}
+                  />
                   <p className="border-t border-border px-4 py-2 text-xs text-muted">
                     These rows are skipped. Fix them in the sheet and import
                     again — already-queued rows will be recognised as duplicates.

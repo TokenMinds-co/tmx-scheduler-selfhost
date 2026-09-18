@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type {
   ButtonHTMLAttributes,
   InputHTMLAttributes,
@@ -493,6 +493,34 @@ export function LoadingRows({
       ))}
     </>
   );
+}
+
+/**
+ * Rows per page, everywhere. One constant rather than a number per table, so
+ * every list in the tool turns a page at the same size — a table that scrolls
+ * differently from the one next to it reads as a bug.
+ */
+export const ROWS_PER_PAGE = 10;
+
+/**
+ * Paging for a list that arrives whole, for the endpoints that return every
+ * row at once. Server-paginated tables keep their own `page` state and pass
+ * the server's `pageSize`/`total` to <Pagination> directly.
+ */
+export function usePagedRows<T>(rows: T[] | undefined, pageSize = ROWS_PER_PAGE) {
+  const [page, setPage] = useState(1);
+  const total = rows?.length ?? 0;
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  // Deleting the last row of the last page would otherwise leave the table
+  // showing an empty slice of a page that no longer exists.
+  const current = Math.min(page, pages);
+  return {
+    rows: rows?.slice((current - 1) * pageSize, current * pageSize),
+    page: current,
+    setPage,
+    pageSize,
+    total,
+  };
 }
 
 /** Previous / next with a count, for any paginated list. */
