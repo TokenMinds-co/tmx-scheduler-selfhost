@@ -185,11 +185,16 @@ export class EmailsController {
     const result = await this.imports.importCsv(file.buffer.toString('utf8'), {
       dryRun,
       defaultTimezone: query.defaultTimezone,
+      sourceFile: file.originalname,
+      actorEmail: actor.email,
     });
 
     if (!dryRun) {
       await this.audit.record(actor, 'import.run', file.originalname, {
-        batchId: result.batchId,
+        // Null when the file was entirely duplicates: the import ran and is
+        // worth logging, but it opened no batch.
+        batch: result.batch ? `Batch ${result.batch.number}` : null,
+        batchId: result.batch?.id ?? null,
         inserted: result.inserted,
         skippedDuplicates: result.skippedDuplicates,
         skippedSuppressed: result.skippedSuppressed,
@@ -206,6 +211,7 @@ function toFilter(query: QueueQueryDto): QueueFilter {
     accountId: query.accountId,
     group: query.group,
     search: query.search,
+    batchId: query.batchId,
     importBatchId: query.importBatchId,
     from: query.from ? new Date(query.from) : undefined,
     to: query.to ? new Date(query.to) : undefined,
@@ -217,13 +223,14 @@ function assertNarrowed(filter: QueueFilter, action: string): void {
     filter.accountId ||
     filter.group ||
     filter.search ||
+    filter.batchId ||
     filter.importBatchId ||
     filter.from ||
     filter.to ||
     filter.status?.length;
   if (!narrowed) {
     throw ApiException.badRequest(
-      `Refusing to ${action} the entire queue. Narrow it by mailbox, group, import or date first.`,
+      `Refusing to ${action} the entire queue. Narrow it by mailbox, group, batch or date first.`,
     );
   }
 }

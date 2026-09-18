@@ -1,10 +1,12 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
 import type {
   AccountDto,
   AccountStats,
+  BatchDto,
   EmailDto,
   EmailStatus,
   Paginated,
@@ -36,17 +38,20 @@ import {
   Meter,
   PageHeader,
   Pagination,
+  ROWS_PER_PAGE,
   Select,
   Spinner,
   Stat,
   StatusBadge,
   cx,
+  usePagedRows,
 } from '@/components/ui';
 
 interface Filters {
   status: EmailStatus[];
   accountId: string;
   group: string;
+  batchId: string;
   search: string;
 }
 
@@ -54,6 +59,7 @@ const EMPTY_FILTERS: Filters = {
   status: [],
   accountId: '',
   group: '',
+  batchId: '',
   search: '',
 };
 
@@ -95,8 +101,17 @@ function Engagement({ email }: { email: EmailDto }) {
   return <span className="text-xs text-muted">No activity</span>;
 }
 
-export default function QueuePage() {
-  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+/**
+ * `?batch=<id>` is how the batch list drills in here, so the filter is read
+ * from the URL as well as from the dropdown — which also makes a filtered
+ * queue a link somebody can send.
+ */
+function QueueView() {
+  const batchParam = useSearchParams().get('batch') ?? '';
+  const [filters, setFilters] = useState<Filters>({
+    ...EMPTY_FILTERS,
+    batchId: batchParam,
+  });
   const [page, setPage] = useState(1);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -110,9 +125,10 @@ export default function QueuePage() {
     if (filters.status.length) params.set('status', filters.status.join(','));
     if (filters.accountId) params.set('accountId', filters.accountId);
     if (filters.group) params.set('group', filters.group);
+    if (filters.batchId) params.set('batchId', filters.batchId);
     if (filters.search) params.set('search', filters.search);
     params.set('page', String(page));
-    params.set('pageSize', '50');
+    params.set('pageSize', String(ROWS_PER_PAGE));
     return params.toString();
   }, [filters, page]);
 
@@ -132,10 +148,22 @@ export default function QueuePage() {
   );
   const accounts = useSWR<AccountDto[]>('/accounts', fetcher);
   const groups = useSWR<string[]>('/emails/groups', fetcher);
+  const batches = useSWR<BatchDto[]>('/batches', fetcher);
+
+  // Arriving from the batch list, or moving between two batches without this
+  // page unmounting in between.
+  useEffect(() => {
+    setPage(1);
+    setFilters((current) => ({ ...current, batchId: batchParam }));
+  }, [batchParam]);
+  // Every mailbox comes back in one response, so this table pages client-side.
+  const mailboxRows = usePagedRows(accountStats.data);
 
   const filtersActive =
     filters.status.length > 0 ||
-    Boolean(filters.accountId || filters.group || filters.search);
+    Boolean(
+      filters.accountId || filters.group || filters.batchId || filters.search,
+    );
 
   function refreshAll() {
     void emails.mutate();
@@ -332,7 +360,7 @@ export default function QueuePage() {
             </thead>
             <tbody>
               {!accountStats.data && <LoadingRows columns={6} rows={2} />}
-              {accountStats.data?.map((row) => (
+              {mailboxRows.rows?.map((row) => (
                 <tr key={row.accountId}>
                   <td>
                     <span className="font-medium">{row.email}</span>{' '}
@@ -398,6 +426,13 @@ export default function QueuePage() {
             </tbody>
           </table>
         </div>
+
+        <Pagination
+          page={mailboxRows.page}
+          pageSize={mailboxRows.pageSize}
+          total={mailboxRows.total}
+          onPage={mailboxRows.setPage}
+        />
       </Card>
 
       {/* Filters */}
@@ -425,6 +460,19 @@ export default function QueuePage() {
               {accounts.data?.map((account) => (
                 <option key={account.id} value={account.id}>
                   {account.email}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Batch">
+            <Select
+              value={filters.batchId}
+              onChange={(e) => setFilter('batchId', e.target.value)}
+            >
+              <option value="">All batches</option>
+              {batches.data?.map((batch) => (
+                <option key={batch.id} value={batch.id}>
+                  Batch {batch.number} · {batch.name}
                 </option>
               ))}
             </Select>
@@ -661,5 +709,15 @@ export default function QueuePage() {
         </Field>
       </Dialog>
     </Shell>
+  );
+}
+
+export default function QueuePage() {
+  // useSearchParams() suspends, and the queue is a static route; without this
+  // boundary the build refuses the page rather than the browser.
+  return (
+    <Suspense fallback={null}>
+      <QueueView />
+    </Suspense>
   );
 }

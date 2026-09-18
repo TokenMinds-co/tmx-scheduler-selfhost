@@ -246,6 +246,7 @@ export interface EmailDto {
   /** First open and click, or null. Populated only for tracked campaign mail. */
   firstOpenAt: string | null;
   firstClickAt: string | null;
+  batchId: string | null;
   importBatchId: string | null;
   createdAt: string;
   updatedAt: string;
@@ -273,6 +274,56 @@ export interface SessionUserDto {
   email: string;
   name: string;
   role: UserRole;
+}
+
+// ---------------------------------------------------------------------------
+// Batches
+// ---------------------------------------------------------------------------
+
+/** Enough of a batch to name it in a sentence. */
+export interface BatchRef {
+  id: string;
+  number: number;
+  name: string;
+}
+
+/**
+ * How a batch performed.
+ *
+ * `sent` is the denominator for both rates, not `inserted`: a batch halfway
+ * through sending would otherwise report an open rate against mail that has
+ * not gone out yet, and read as failing when it is simply not finished.
+ *
+ * Opens and clicks are counted raw — one per recipient who registered either,
+ * which is what every mail platform means by the word. Scanner traffic inflates
+ * opens badly on cold B2B; the event log keeps the evidence to tell them apart
+ * (see `TrackingStats`), and this is deliberately the unfiltered number that
+ * lines up with what other tools report.
+ */
+export interface BatchStats {
+  byStatus: Record<EmailStatus, number>;
+  /** Messages that actually went out. */
+  sent: number;
+  opened: number;
+  clicked: number;
+  /** Shares of `sent`, 0–1. Zero until something has been sent. */
+  openRate: number;
+  clickRate: number;
+  firstSentAt: string | null;
+  lastSentAt: string | null;
+}
+
+export interface BatchDto extends BatchRef {
+  sourceFile: string | null;
+  createdBy: string | null;
+  /** As reported by the import that created it, frozen that day. */
+  totalRows: number;
+  inserted: number;
+  skippedDuplicates: number;
+  skippedSuppressed: number;
+  errorCount: number;
+  createdAt: string;
+  stats: BatchStats;
 }
 
 // ---------------------------------------------------------------------------
@@ -309,7 +360,12 @@ export interface ImportRowError {
 }
 
 export interface ImportResult {
-  batchId: string;
+  /**
+   * The batch this import created, or null when it created none — a dry run,
+   * or a file whose every row was already queued. Neither put mail in front of
+   * anyone, so neither takes a number.
+   */
+  batch: BatchRef | null;
   totalRows: number;
   inserted: number;
   /** Rows that matched an existing dedupe key. */

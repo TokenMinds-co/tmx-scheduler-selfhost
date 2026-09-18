@@ -19,6 +19,7 @@ export interface QueueFilter {
   search?: string;
   from?: Date;
   to?: Date;
+  batchId?: string;
   importBatchId?: string;
 }
 
@@ -383,6 +384,7 @@ export class EmailsService {
         : '00000000-0000-0000-0000-000000000000';
     }
     if (filter.group) where.group = filter.group;
+    if (filter.batchId) where.batchId = filter.batchId;
     if (filter.importBatchId) where.importBatchId = filter.importBatchId;
     if (filter.from || filter.to) {
       where.scheduledAt = {
@@ -426,6 +428,7 @@ export function toDto(email: QueuedEmail): EmailDto {
     claimedAt: email.claimedAt?.toISOString() ?? null,
     firstOpenAt: email.firstOpenAt?.toISOString() ?? null,
     firstClickAt: email.firstClickAt?.toISOString() ?? null,
+    batchId: email.batchId,
     importBatchId: email.importBatchId,
     createdAt: email.createdAt.toISOString(),
     updatedAt: email.updatedAt.toISOString(),
