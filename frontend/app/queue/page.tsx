@@ -715,8 +715,13 @@ function QueueView() {
                     )}
                   </td>
 
-                  <td className="whitespace-nowrap text-right">
+                  {/* Sent and sending mail has nothing to act on, and an
+                      empty cell reads as a button that failed to draw. */}
+                  <td className="w-24 whitespace-nowrap text-right">
                     <div className="flex items-center justify-end gap-0.5">
+                      {(email.status === 'sent' || email.status === 'sending') && (
+                        <span className="text-muted">—</span>
+                      )}
                       {email.status === 'pending' && (
                         <>
                           <IconButton
