@@ -88,7 +88,9 @@ export class ImportService {
     options: {
       dryRun: boolean;
       defaultTimezone?: string;
-      /** Upload filename, which names the batch until someone renames it. */
+      /** What to call the batch; empty names it after its own number. */
+      batchName?: string;
+      /** Upload filename, recorded on the batch whether or not it names it. */
       sourceFile?: string;
       actorEmail?: string;
     },
@@ -245,6 +247,7 @@ export class ImportService {
       totalRows: rows.length,
       skippedDuplicates,
       skippedSuppressed,
+      batchName: options.batchName,
       sourceFile: options.sourceFile,
       actorEmail: options.actorEmail,
     });
@@ -294,6 +297,7 @@ export class ImportService {
       totalRows: number;
       skippedDuplicates: number;
       skippedSuppressed: number;
+      batchName?: string;
       sourceFile?: string;
       actorEmail?: string;
     },
@@ -324,9 +328,10 @@ export class ImportService {
           const opened = await tx.batch.create({
             data: {
               number: Number(next),
-              // Named after the file for now. The number is not known until the
-              // row exists, so an upload with no filename is named below.
-              name: report.sourceFile?.trim() || '',
+              // Whatever the import screen was given. The fallback needs the
+              // number, which is known here but reads better written once, so
+              // an unnamed batch is named just below.
+              name: report.batchName?.trim() || '',
               sourceFile: report.sourceFile ?? null,
               createdBy: report.actorEmail ?? null,
               totalRows: report.totalRows,

@@ -8,6 +8,7 @@ import {
   IsOptional,
   IsString,
   Max,
+  MaxLength,
   Min,
 } from 'class-validator';
 import { EMAIL_STATUSES, EmailStatus } from '@ims/shared';
@@ -97,4 +98,10 @@ export class ImportQueryDto {
   @IsOptional()
   @IsString()
   defaultTimezone?: string;
+
+  /** What to call the batch. Empty means name it after its own number. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  batchName?: string;
 }

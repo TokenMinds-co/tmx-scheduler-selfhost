@@ -14,6 +14,7 @@ import {
   Button,
   Card,
   Field,
+  Input,
   PageHeader,
   Pagination,
   Select,
@@ -185,6 +186,7 @@ export default function ImportPage() {
   const [defaultTimezone, setDefaultTimezone] = useState<string>(
     DEFAULTS.timezone,
   );
+  const [batchName, setBatchName] = useState('');
   const [preview, setPreview] = useState<ImportResult | null>(null);
   const [committed, setCommitted] = useState<ImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -210,6 +212,7 @@ export default function ImportPage() {
         query: {
           dryRun: String(dryRun),
           defaultTimezone: defaultTimezone || undefined,
+          batchName: batchName.trim() || undefined,
         },
       });
       if (dryRun) {
@@ -250,6 +253,21 @@ export default function ImportPage() {
           <Card title="File">
             <div className="grid gap-4 p-4">
               <DropZone file={file} onFile={chooseFile} />
+              <Field
+                label="Name this batch"
+                hint="Optional. Left empty it is called after its own number — Batch 7 — and can be renamed from the batches screen at any time."
+              >
+                <Input
+                  value={batchName}
+                  placeholder={
+                    file
+                      ? file.name.replace(/\.csv$/i, '')
+                      : 'Autumn outreach — US'
+                  }
+                  maxLength={120}
+                  onChange={(e) => setBatchName(e.target.value)}
+                />
+              </Field>
               <Field
                 label="What timezone is this sheet written in?"
                 hint="Applied to Schedule cells that carry no zone of their own. A cell that names its own zone always overrides this."
@@ -306,7 +324,11 @@ export default function ImportPage() {
             <Alert tone="success">
               Queued {plural(committed.inserted, 'message')}
               {committed.batch ? (
-                <> as batch {committed.batch.number}</>
+                <>
+                  {' '}
+                  as batch {committed.batch.number}, “{committed.batch.name}
+                  ”
+                </>
               ) : (
                 <> — every row was already in the queue, so no batch was opened</>
               )}

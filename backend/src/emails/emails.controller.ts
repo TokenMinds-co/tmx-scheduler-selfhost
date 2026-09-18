@@ -185,6 +185,7 @@ export class EmailsController {
     const result = await this.imports.importCsv(file.buffer.toString('utf8'), {
       dryRun,
       defaultTimezone: query.defaultTimezone,
+      batchName: query.batchName,
       sourceFile: file.originalname,
       actorEmail: actor.email,
     });

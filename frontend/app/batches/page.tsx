@@ -137,6 +137,7 @@ function BatchCard({
             <p className="mt-1 text-xs text-muted">
               Imported {formatShort(batch.createdAt)}
               {batch.createdBy && <> by {batch.createdBy}</>}
+              {batch.sourceFile && <> · {batch.sourceFile}</>}
               {stats.lastSentAt && (
                 <> · last send {formatShort(stats.lastSentAt)}</>
               )}
