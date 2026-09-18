@@ -19,7 +19,10 @@ import {
   Input,
   LoadingRows,
   PageHeader,
+  Pagination,
+  ROWS_PER_PAGE,
   Select,
+  usePagedRows,
 } from '@/components/ui';
 
 /**
@@ -50,9 +53,15 @@ export default function SettingsPage() {
   const isAdmin = user?.role === 'admin';
 
   const users = useSWR<SessionUserDto[]>(isAdmin ? '/auth/users' : null, fetcher);
+  // /auth/users returns every operator at once, so this table pages here.
+  const userRows = usePagedRows(users.data);
+  const [auditPage, setAuditPage] = useState(1);
   const audit = useSWR<Paginated<AuditEntryDto>>(
-    isAdmin ? '/audit?pageSize=50' : null,
+    isAdmin ? `/audit?page=${auditPage}&pageSize=${ROWS_PER_PAGE}` : null,
     fetcher,
+    // Paging keeps the current rows on screen instead of flashing the loading
+    // skeleton between two pages that are both already one request away.
+    { keepPreviousData: true },
   );
 
   const [form, setForm] = useState({
@@ -194,7 +203,7 @@ export default function SettingsPage() {
               </thead>
               <tbody>
                 {!users.data && <LoadingRows columns={4} rows={2} />}
-                {users.data?.map((row) => (
+                {userRows.rows?.map((row) => (
                   <tr key={row.id}>
                     <td className="font-medium">
                       {row.email}
@@ -223,6 +232,13 @@ export default function SettingsPage() {
               </tbody>
             </table>
           </div>
+
+          <Pagination
+            page={userRows.page}
+            pageSize={userRows.pageSize}
+            total={userRows.total}
+            onPage={userRows.setPage}
+          />
         </Card>
       </div>
 
@@ -269,6 +285,15 @@ export default function SettingsPage() {
             </tbody>
           </table>
         </div>
+
+        {audit.data && (
+          <Pagination
+            page={auditPage}
+            pageSize={audit.data.pageSize}
+            total={audit.data.total}
+            onPage={setAuditPage}
+          />
+        )}
       </Card>
     </Shell>
   );

@@ -87,6 +87,45 @@ export class EmailsController {
     return this.emails.get(id);
   }
 
+  /**
+   * Bulk cancel. Refuses an empty filter: "cancel everything in the queue" is
+   * a real operation but never an accidental one, so it has to be spelled out
+   * with at least one narrowing condition.
+   *
+   * Declared above `:id/cancel`, and it has to stay there. Routes match in the
+   * order they are declared, so with `:id/cancel` first every bulk cancel was
+   * read as a request to cancel the message whose id is "bulk" and answered
+   * "Message not found" — the button on the queue screen has never once
+   * cancelled anything.
+   */
+  @Post('bulk/cancel')
+  async bulkCancel(
+    @Body() dto: BulkActionDto,
+    @CurrentUser() actor: AuthUser,
+  ) {
+    const filter = toFilter(dto);
+    assertNarrowed(filter, 'cancel');
+    const cancelled = await this.emails.cancelMany(filter);
+    await this.audit.record(actor, 'email.bulk_cancel', null, {
+      filter: dto,
+      cancelled,
+    });
+    return { cancelled };
+  }
+
+  /** Above `:id/retry` for the same reason `bulk/cancel` is above `:id/cancel`. */
+  @Post('bulk/retry')
+  async bulkRetry(@Body() dto: BulkActionDto, @CurrentUser() actor: AuthUser) {
+    const filter = toFilter(dto);
+    assertNarrowed(filter, 'retry');
+    const retried = await this.emails.retryMany(filter);
+    await this.audit.record(actor, 'email.bulk_retry', null, {
+      filter: dto,
+      retried,
+    });
+    return { retried };
+  }
+
   @Post(':id/cancel')
   async cancel(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
     const email = await this.emails.cancel(id);
@@ -127,38 +166,6 @@ export class EmailsController {
   }
 
   /**
-   * Bulk cancel. Refuses an empty filter: "cancel everything in the queue" is
-   * a real operation but never an accidental one, so it has to be spelled out
-   * with at least one narrowing condition.
-   */
-  @Post('bulk/cancel')
-  async bulkCancel(
-    @Body() dto: BulkActionDto,
-    @CurrentUser() actor: AuthUser,
-  ) {
-    const filter = toFilter(dto);
-    assertNarrowed(filter, 'cancel');
-    const cancelled = await this.emails.cancelMany(filter);
-    await this.audit.record(actor, 'email.bulk_cancel', null, {
-      filter: dto,
-      cancelled,
-    });
-    return { cancelled };
-  }
-
-  @Post('bulk/retry')
-  async bulkRetry(@Body() dto: BulkActionDto, @CurrentUser() actor: AuthUser) {
-    const filter = toFilter(dto);
-    assertNarrowed(filter, 'retry');
-    const retried = await this.emails.retryMany(filter);
-    await this.audit.record(actor, 'email.bulk_retry', null, {
-      filter: dto,
-      retried,
-    });
-    return { retried };
-  }
-
-  /**
    * CSV upload. `dryRun=true` validates and reports without writing, which is
    * what the import screen shows before the operator commits.
    */
@@ -178,11 +185,16 @@ export class EmailsController {
     const result = await this.imports.importCsv(file.buffer.toString('utf8'), {
       dryRun,
       defaultTimezone: query.defaultTimezone,
+      sourceFile: file.originalname,
+      actorEmail: actor.email,
     });
 
     if (!dryRun) {
       await this.audit.record(actor, 'import.run', file.originalname, {
-        batchId: result.batchId,
+        // Null when the file was entirely duplicates: the import ran and is
+        // worth logging, but it opened no batch.
+        batch: result.batch ? `Batch ${result.batch.number}` : null,
+        batchId: result.batch?.id ?? null,
         inserted: result.inserted,
         skippedDuplicates: result.skippedDuplicates,
         skippedSuppressed: result.skippedSuppressed,
@@ -199,6 +211,7 @@ function toFilter(query: QueueQueryDto): QueueFilter {
     accountId: query.accountId,
     group: query.group,
     search: query.search,
+    batchId: query.batchId,
     importBatchId: query.importBatchId,
     from: query.from ? new Date(query.from) : undefined,
     to: query.to ? new Date(query.to) : undefined,
@@ -210,13 +223,14 @@ function assertNarrowed(filter: QueueFilter, action: string): void {
     filter.accountId ||
     filter.group ||
     filter.search ||
+    filter.batchId ||
     filter.importBatchId ||
     filter.from ||
     filter.to ||
     filter.status?.length;
   if (!narrowed) {
     throw ApiException.badRequest(
-      `Refusing to ${action} the entire queue. Narrow it by mailbox, group, import or date first.`,
+      `Refusing to ${action} the entire queue. Narrow it by mailbox, group, batch or date first.`,
     );
   }
 }

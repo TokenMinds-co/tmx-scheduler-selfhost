@@ -15,6 +15,7 @@ import { AuditModule } from './audit/audit.module';
 import { AccountsModule } from './accounts/accounts.module';
 import { SignaturesModule } from './signatures/signatures.module';
 import { EmailsModule } from './emails/emails.module';
+import { BatchesModule } from './batches/batches.module';
 import { SuppressionModule } from './suppression/suppression.module';
 import { SenderModule } from './sender/sender.module';
 import { UnsubscribeModule } from './unsubscribe/unsubscribe.module';
@@ -47,6 +48,7 @@ import { HealthController } from './health.controller';
     AccountsModule,
     SignaturesModule,
     EmailsModule,
+    BatchesModule,
     SuppressionModule,
     SenderModule,
     UnsubscribeModule,
