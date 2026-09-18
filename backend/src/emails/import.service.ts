@@ -1,8 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { parse } from 'csv-parse/sync';
-import { randomUUID } from 'node:crypto';
-import { ImportResult, ImportRowError } from '@ims/shared';
+import { BatchRef, ImportResult, ImportRowError } from '@ims/shared';
 import { ApiException } from '../common/errors';
 import { dedupeKey } from '../common/crypto.service';
 import { sanitizeMessageHtml } from '../common/html';
@@ -58,6 +57,14 @@ const EMAIL_PATTERN = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]{2,}$/;
 
 const MAX_ROWS = 20_000;
 
+/**
+ * Raised to roll the batch back when every row turned out to be queued
+ * already. Nothing reached a recipient, so nothing should be reported as a
+ * batch — re-importing a sheet to check it is already queued is a normal thing
+ * to do, and it should leave no trace.
+ */
+class NothingQueued extends Error {}
+
 @Injectable()
 export class ImportService {
   private readonly logger = new Logger(ImportService.name);
@@ -78,7 +85,13 @@ export class ImportService {
    */
   async importCsv(
     content: string,
-    options: { dryRun: boolean; defaultTimezone?: string },
+    options: {
+      dryRun: boolean;
+      defaultTimezone?: string;
+      /** Upload filename, which names the batch until someone renames it. */
+      sourceFile?: string;
+      actorEmail?: string;
+    },
   ): Promise<ImportResult> {
     // Rejected up front rather than per row: one mistyped zone would
     // otherwise fail every line in the file with the same message.
@@ -91,7 +104,6 @@ export class ImportService {
       );
     }
 
-    const batchId = randomUUID();
     const rows = this.parseFile(content);
 
     if (rows.length > MAX_ROWS) {
@@ -213,14 +225,13 @@ export class ImportService {
           scheduledAt: schedule.utc,
           status: 'pending',
           dedupeKey: key,
-          importBatchId: batchId,
         },
       });
     }
 
     if (options.dryRun) {
       return {
-        batchId,
+        batch: null,
         totalRows: rows.length,
         inserted: candidates.length,
         skippedDuplicates,
@@ -230,20 +241,27 @@ export class ImportService {
       };
     }
 
-    const inserted = await this.insert(candidates, errors);
+    const committed = await this.commit(candidates, errors, {
+      totalRows: rows.length,
+      skippedDuplicates,
+      skippedSuppressed,
+      sourceFile: options.sourceFile,
+      actorEmail: options.actorEmail,
+    });
     // Everything the unique index rejected was a duplicate of mail already in
     // the queue, which is a skip rather than an error the operator must fix.
-    skippedDuplicates += candidates.length - inserted;
+    skippedDuplicates += committed.skippedExisting;
 
     this.logger.log(
-      `Import ${batchId}: ${inserted} queued, ${skippedDuplicates} duplicate, ` +
+      `Import ${committed.batch ? `batch ${committed.batch.number}` : '(no batch)'}: ` +
+        `${committed.inserted} queued, ${skippedDuplicates} duplicate, ` +
         `${skippedSuppressed} suppressed, ${errors.length} error(s)`,
     );
 
     return {
-      batchId,
+      batch: committed.batch,
       totalRows: rows.length,
-      inserted,
+      inserted: committed.inserted,
       skippedDuplicates,
       skippedSuppressed,
       errors,
@@ -252,7 +270,13 @@ export class ImportService {
   }
 
   /**
-   * Inserts the batch, skipping rows that duplicate mail already queued.
+   * Opens the batch and writes its rows, together or not at all.
+   *
+   * The batch is created first because the rows need its id, and the counts it
+   * could not know until afterwards are written back before the transaction
+   * commits. One transaction, so a batch never outlives the mail it claims to
+   * have queued — and an import that turns out to be entirely duplicates rolls
+   * its batch away rather than leaving an empty one at the top of the list.
    *
    * `skipDuplicates` makes the unique index on `dedupeKey` a filter rather
    * than an error: one statement inserts everything new and silently drops the
@@ -260,23 +284,100 @@ export class ImportService {
    * must go and fix.
    *
    * Anything else (a constraint violation, a dead connection) is a real
-   * failure, and is reported against the batch rather than invented per row —
-   * Postgres aborts the statement, so no individual row is at fault.
+   * failure, and is reported against the whole file rather than invented per
+   * row — Postgres aborts the statement, so no individual row is at fault.
    */
-  private async insert(
+  private async commit(
     candidates: Array<{ row: number; doc: Record<string, unknown> }>,
     errors: ImportRowError[],
-  ): Promise<number> {
-    if (!candidates.length) return 0;
+    report: {
+      totalRows: number;
+      skippedDuplicates: number;
+      skippedSuppressed: number;
+      sourceFile?: string;
+      actorEmail?: string;
+    },
+  ): Promise<{
+    batch: BatchRef | null;
+    inserted: number;
+    skippedExisting: number;
+  }> {
+    if (!candidates.length) {
+      return { batch: null, inserted: 0, skippedExisting: 0 };
+    }
+
     try {
-      const result = await this.prisma.queuedEmail.createMany({
-        data: candidates.map(
-          (candidate) => candidate.doc as unknown as Prisma.QueuedEmailCreateManyInput,
-        ),
-        skipDuplicates: true,
-      });
-      return result.count;
+      return await this.prisma.$transaction(
+        async (tx) => {
+          // The number is taken here rather than from the column's sequence,
+          // because a sequence does not roll back: an import that turns out to
+          // be all duplicates would still consume one, and the batch list would
+          // skip from 3 to 5 with nothing to point at for 4. Two imports
+          // committing at once serialise on this lock, which is what stops both
+          // reading the same maximum. It is held for the insert that follows,
+          // and imports are a handful a day.
+          await tx.$executeRaw`LOCK TABLE "batches" IN SHARE ROW EXCLUSIVE MODE`;
+          const [{ next }] = await tx.$queryRaw<[{ next: number }]>`
+            SELECT COALESCE(MAX("number"), 0) + 1 AS next FROM "batches"
+          `;
+
+          const opened = await tx.batch.create({
+            data: {
+              number: Number(next),
+              // Named after the file for now. The number is not known until the
+              // row exists, so an upload with no filename is named below.
+              name: report.sourceFile?.trim() || '',
+              sourceFile: report.sourceFile ?? null,
+              createdBy: report.actorEmail ?? null,
+              totalRows: report.totalRows,
+              skippedSuppressed: report.skippedSuppressed,
+              errorCount: errors.length,
+            },
+          });
+
+          const result = await tx.queuedEmail.createMany({
+            data: candidates.map(
+              (candidate) =>
+                ({
+                  ...candidate.doc,
+                  batchId: opened.id,
+                  // Written to both columns, so the older `importBatchId`
+                  // filter goes on selecting exactly one import's mail.
+                  importBatchId: opened.id,
+                }) as unknown as Prisma.QueuedEmailCreateManyInput,
+            ),
+            skipDuplicates: true,
+          });
+          if (result.count === 0) throw new NothingQueued();
+
+          const batch = await tx.batch.update({
+            where: { id: opened.id },
+            data: {
+              inserted: result.count,
+              skippedDuplicates:
+                report.skippedDuplicates + (candidates.length - result.count),
+              name: opened.name || `Batch ${opened.number}`,
+            },
+          });
+
+          return {
+            batch: { id: batch.id, number: batch.number, name: batch.name },
+            inserted: result.count,
+            skippedExisting: candidates.length - result.count,
+          };
+        },
+        // A 20,000-row file is one statement, but it is a long one, and the 5s
+        // default would abandon an import that was going to succeed.
+        { timeout: 120_000, maxWait: 15_000 },
+      );
     } catch (error) {
+      if (error instanceof NothingQueued) {
+        // Every row was already queued. No batch, and no errors either:
+        // re-importing a sheet that is already in the queue is a no-op rather
+        // than something anyone has to fix.
+        return { batch: null, inserted: 0, skippedExisting: candidates.length };
+      }
+
       const reason =
         error instanceof Prisma.PrismaClientKnownRequestError
           ? `Database rejected the batch (${error.code}): ${error.message.split('\n').pop()}`
@@ -288,7 +389,7 @@ export class ImportService {
           reason,
         });
       }
-      return 0;
+      return { batch: null, inserted: 0, skippedExisting: 0 };
     }
   }
 

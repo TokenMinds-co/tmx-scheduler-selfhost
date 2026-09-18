@@ -130,6 +130,48 @@ model Signature {
   @@map("signatures")
 }
 
+/// One committed import, numbered.
+///
+/// A batch exists only once rows have actually reached the queue: a dry-run
+/// preview reserves nothing, and an import whose every row was a duplicate
+/// creates nothing, because neither put mail in front of anyone.
+///
+/// Numbered as well as identified, because a batch is something operators say
+/// out loud — "batch 7 went out yesterday" — and a uuid cannot be said. The
+/// number is allocated inside the import's own transaction (see ImportService)
+/// so that an import which queues nothing gives its number back; the sequence
+/// behind this column is only the fallback for a row written any other way.
+model Batch {
+  id     String @id @default(uuid()) @db.Uuid
+  number Int    @unique @default(autoincrement())
+
+  /// Defaults to the uploaded filename, renameable afterwards — the file a
+  /// list arrived in is rarely what the campaign ends up being called.
+  name String
+
+  sourceFile String?
+  /// Operator who ran the import, copied rather than joined so the batch still
+  /// reads correctly after that user is deleted.
+  createdBy  String?
+
+  /// What the import reported, frozen as of the day it ran. `inserted` is the
+  /// denominator every rate is taken over, which is why it is stored instead of
+  /// counted live: cancelling a queued row must not quietly raise the open rate
+  /// of a batch that already went out.
+  totalRows         Int
+  inserted          Int @default(0)
+  skippedDuplicates Int @default(0)
+  skippedSuppressed Int @default(0)
+  errorCount        Int @default(0)
+
+  emails QueuedEmail[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("batches")
+}
+
 /// One scheduled message.
 ///
 /// `accountId` is an indexed column rather than a foreign key, which preserves
@@ -182,7 +224,21 @@ model QueuedEmail {
   /// a message is how an operator says they did not mean to send it; if the
   /// cancelled row kept the key reserved, re-importing the corrected sheet
   /// would silently skip the very row they were trying to fix.
-  dedupeKey     String
+  dedupeKey String
+
+  /// The batch that queued this row.
+  ///
+  /// Nullable only because the column was added to a table that already held
+  /// mail; the migration that added it put every one of those rows in batch 1,
+  /// and every import since fills it. Restrict on delete, so a batch cannot be
+  /// removed out from under the mail it is the report for.
+  batchId String? @db.Uuid
+  batch   Batch?  @relation(fields: [batchId], references: [id], onDelete: Restrict)
+
+  /// The raw per-run id imports carried before batches existed. Kept because it
+  /// is the only record of which pre-batch rows arrived together, and still
+  /// written — identical to `batchId` — so the `importBatchId` filter that
+  /// predates this table goes on meaning what it did.
   importBatchId String?
 
   createdAt DateTime @default(now())
@@ -197,6 +253,7 @@ model QueuedEmail {
   @@index([toEmail])
   @@index([group])
   @@index([importBatchId])
+  @@index([batchId])
   /// Declared so `migrate dev` stops dropping it as drift. The *partial* unique
   /// index that does the real work lives in the migration, invisible to Prisma
   /// — which is the only reason it survives a drift check at all.

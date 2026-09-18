@@ -40,6 +40,11 @@ export class QueueQueryDto {
 
   @IsOptional()
   @IsString()
+  batchId?: string;
+
+  /** Pre-batch imports; kept so links and saved filters from before still work. */
+  @IsOptional()
+  @IsString()
   importBatchId?: string;
 
   @IsOptional()

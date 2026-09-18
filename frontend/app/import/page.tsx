@@ -304,8 +304,13 @@ export default function ImportPage() {
 
           {committed && (
             <Alert tone="success">
-              Queued {plural(committed.inserted, 'message')} as batch{' '}
-              <code className="font-mono text-xs">{committed.batchId}</code>.{' '}
+              Queued {plural(committed.inserted, 'message')}
+              {committed.batch ? (
+                <> as batch {committed.batch.number}</>
+              ) : (
+                <> — every row was already in the queue, so no batch was opened</>
+              )}
+              .{' '}
               <button
                 type="button"
                 className="font-medium underline"
