@@ -87,6 +87,45 @@ export class EmailsController {
     return this.emails.get(id);
   }
 
+  /**
+   * Bulk cancel. Refuses an empty filter: "cancel everything in the queue" is
+   * a real operation but never an accidental one, so it has to be spelled out
+   * with at least one narrowing condition.
+   *
+   * Declared above `:id/cancel`, and it has to stay there. Routes match in the
+   * order they are declared, so with `:id/cancel` first every bulk cancel was
+   * read as a request to cancel the message whose id is "bulk" and answered
+   * "Message not found" — the button on the queue screen has never once
+   * cancelled anything.
+   */
+  @Post('bulk/cancel')
+  async bulkCancel(
+    @Body() dto: BulkActionDto,
+    @CurrentUser() actor: AuthUser,
+  ) {
+    const filter = toFilter(dto);
+    assertNarrowed(filter, 'cancel');
+    const cancelled = await this.emails.cancelMany(filter);
+    await this.audit.record(actor, 'email.bulk_cancel', null, {
+      filter: dto,
+      cancelled,
+    });
+    return { cancelled };
+  }
+
+  /** Above `:id/retry` for the same reason `bulk/cancel` is above `:id/cancel`. */
+  @Post('bulk/retry')
+  async bulkRetry(@Body() dto: BulkActionDto, @CurrentUser() actor: AuthUser) {
+    const filter = toFilter(dto);
+    assertNarrowed(filter, 'retry');
+    const retried = await this.emails.retryMany(filter);
+    await this.audit.record(actor, 'email.bulk_retry', null, {
+      filter: dto,
+      retried,
+    });
+    return { retried };
+  }
+
   @Post(':id/cancel')
   async cancel(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
     const email = await this.emails.cancel(id);
@@ -124,38 +163,6 @@ export class EmailsController {
       emailId: email.id,
     });
     return email;
-  }
-
-  /**
-   * Bulk cancel. Refuses an empty filter: "cancel everything in the queue" is
-   * a real operation but never an accidental one, so it has to be spelled out
-   * with at least one narrowing condition.
-   */
-  @Post('bulk/cancel')
-  async bulkCancel(
-    @Body() dto: BulkActionDto,
-    @CurrentUser() actor: AuthUser,
-  ) {
-    const filter = toFilter(dto);
-    assertNarrowed(filter, 'cancel');
-    const cancelled = await this.emails.cancelMany(filter);
-    await this.audit.record(actor, 'email.bulk_cancel', null, {
-      filter: dto,
-      cancelled,
-    });
-    return { cancelled };
-  }
-
-  @Post('bulk/retry')
-  async bulkRetry(@Body() dto: BulkActionDto, @CurrentUser() actor: AuthUser) {
-    const filter = toFilter(dto);
-    assertNarrowed(filter, 'retry');
-    const retried = await this.emails.retryMany(filter);
-    await this.audit.record(actor, 'email.bulk_retry', null, {
-      filter: dto,
-      retried,
-    });
-    return { retried };
   }
 
   /**
