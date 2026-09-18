@@ -243,7 +243,7 @@ export default function SettingsPage() {
       </div>
 
       <Card title="Audit log" className="mt-4">
-        <div className="table-scroll">
+        <div className="table-scroll table-scroll-wide">
           <table className="data-table">
             <thead>
               <tr>

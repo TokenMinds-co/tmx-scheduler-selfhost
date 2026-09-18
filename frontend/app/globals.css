@@ -77,12 +77,49 @@ body {
 }
 
 /* Tables of scheduled mail are always wider than a laptop; the page itself
-   must never scroll sideways, so each table owns its own scroll container. */
+   must never scroll sideways, so each table owns its own scroll container.
+   The scrollbar is styled down to a hairline that appears on hover: a table
+   that needs 56rem shows one on every laptop, and the OS default draws a grey
+   slab across the bottom of the card whether or not anyone is scrolling. */
 .table-scroll {
   overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
 }
 
-.table-scroll table {
+.table-scroll:hover,
+.table-scroll:focus-within {
+  scrollbar-color: var(--color-border) transparent;
+}
+
+.table-scroll::-webkit-scrollbar {
+  height: 0.5rem;
+}
+
+.table-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.table-scroll::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+}
+
+.table-scroll:hover::-webkit-scrollbar-thumb,
+.table-scroll:focus-within::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+}
+
+/*
+ * Opt-in, not automatic.
+ *
+ * This floor used to apply to every table in the tool, which meant the
+ * four-column Users table — sitting in a half-width card that is nowhere near
+ * 56rem — was widened past its container and scrolled sideways for no reason.
+ * Only tables that genuinely carry a laptop-width row get it, and a narrow
+ * table is simply allowed to be narrow.
+ */
+.table-scroll-wide table {
   min-width: 56rem;
 }
 

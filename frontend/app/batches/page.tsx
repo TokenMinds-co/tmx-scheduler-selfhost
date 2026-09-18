@@ -5,6 +5,7 @@ import { useState } from 'react';
 import useSWR from 'swr';
 import type { BatchDto, EmailStatus } from '@ims/shared';
 import { Shell } from '@/components/Shell';
+import { ICONS, Icon } from '@/components/icons';
 import { api, fetcher } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { formatShort, plural } from '@/lib/format';
@@ -15,6 +16,7 @@ import {
   Dialog,
   EmptyState,
   Field,
+  IconButton,
   Input,
   PageHeader,
   Pagination,
@@ -44,31 +46,45 @@ const CHIP_CLASS: Record<string, string> = {
 };
 
 /**
- * One rate, with the rule beside it.
+ * One number, its share as a bar, and the count it came from.
  *
- * The rule is what separates the two rates from the count to their left at a
- * glance — the same job the vertical keyline does in a campaign report.
+ * The bar is the point: three percentages side by side are three numbers to
+ * compare in your head, and three bars of different lengths are one glance.
+ * It is drawn against the same 0–100% track in every card, so batches can be
+ * compared down the column as well as across the row.
  */
-function Rate({
+function Metric({
   label,
   value,
+  detail,
+  share,
   tone,
 }: {
   label: string;
   value: string;
-  tone: 'open' | 'click';
+  detail: string;
+  share: number;
+  tone: 'accent' | 'sent';
 }) {
   return (
-    <div className="flex items-stretch gap-3">
-      <div
-        className={cx(
-          'w-0.5 rounded-full',
-          tone === 'open' ? 'bg-sent' : 'bg-accent',
-        )}
-      />
-      <div>
-        <div className="text-lg font-semibold tabular-nums">{value}</div>
-        <div className="text-xs text-muted">{label}</div>
+    <div className="min-w-0">
+      <div className="flex items-baseline gap-2">
+        <span className="text-xl font-semibold tabular-nums">{value}</span>
+        <span className="truncate text-xs text-muted">{detail}</span>
+      </div>
+      <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-canvas">
+        <div
+          className={cx(
+            'h-full rounded-full transition-[width] duration-500',
+            tone === 'sent' ? 'bg-sent' : 'bg-accent',
+          )}
+          // Clamped, because a rate can exceed 1: a recipient who opens a
+          // message they were sent twice is counted on both rows.
+          style={{ width: `${Math.min(100, Math.max(0, share * 100))}%` }}
+        />
+      </div>
+      <div className="mt-1 text-xs uppercase tracking-wide text-muted">
+        {label}
       </div>
     </div>
   );
@@ -84,65 +100,92 @@ function BatchCard({
   onRename: (batch: BatchDto) => void;
 }) {
   const { stats } = batch;
-  const sending = stats.byStatus.pending + stats.byStatus.sending > 0;
+  const queued = stats.byStatus.pending + stats.byStatus.sending;
+  const progress = batch.inserted ? stats.sent / batch.inserted : 0;
 
   return (
     <Card>
-      <div className="flex flex-wrap items-center gap-x-8 gap-y-4 p-4">
-        <div className="min-w-[16rem] flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-semibold text-accent">
-              Batch {batch.number}
-            </span>
-            {CHIP_STATUSES.map((status) =>
-              stats.byStatus[status] > 0 ? (
-                <span
-                  key={status}
-                  className={cx(
-                    'rounded-full px-2 py-0.5 text-xs font-medium',
-                    CHIP_CLASS[status],
-                  )}
-                >
-                  {stats.byStatus[status].toLocaleString()} {status}
-                </span>
-              ) : null,
+      <div className="p-4">
+        {/* Identity and actions. One row, so the eye runs along the batch
+            names when scanning the list rather than hunting across a gap. */}
+        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-semibold text-accent">
+                Batch {batch.number}
+              </span>
+              <h2 className="truncate font-medium" title={batch.name}>
+                {batch.name}
+              </h2>
+              {CHIP_STATUSES.map((status) =>
+                stats.byStatus[status] > 0 ? (
+                  <span
+                    key={status}
+                    className={cx(
+                      'rounded-full px-2 py-0.5 text-xs font-medium',
+                      CHIP_CLASS[status],
+                    )}
+                  >
+                    {stats.byStatus[status].toLocaleString()} {status}
+                  </span>
+                ) : null,
+              )}
+            </div>
+
+            {/* Where it came from and who ran it — the questions asked of a
+                batch nobody recognises. */}
+            <p className="mt-1 text-xs text-muted">
+              Imported {formatShort(batch.createdAt)}
+              {batch.createdBy && <> by {batch.createdBy}</>}
+              {stats.lastSentAt && (
+                <> · last send {formatShort(stats.lastSentAt)}</>
+              )}
+            </p>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-1">
+            <Link href={`/queue?batch=${batch.id}`}>
+              <Button>Messages</Button>
+            </Link>
+            {canRename && (
+              <IconButton
+                label="Rename batch"
+                onClick={() => onRename(batch)}
+                icon={<Icon>{ICONS.pencil}</Icon>}
+              />
             )}
           </div>
-
-          <h2 className="mt-1.5 truncate font-medium" title={batch.name}>
-            {batch.name}
-          </h2>
-
-          {/* Where it came from and who ran it — the questions asked of a batch
-              nobody recognises. */}
-          <p className="mt-0.5 text-xs text-muted">
-            Imported {formatShort(batch.createdAt)}
-            {batch.createdBy && <> by {batch.createdBy}</>}
-            {stats.lastSentAt && <> · last send {formatShort(stats.lastSentAt)}</>}
-          </p>
         </div>
 
-        <div>
-          <div className="text-lg font-semibold tabular-nums">
-            {stats.sent.toLocaleString()}
-          </div>
-          <div className="text-xs text-muted">
-            {sending ? `of ${batch.inserted.toLocaleString()} sent` : 'emails sent'}
-          </div>
-        </div>
-
-        <Rate label="opened" value={percent(stats.openRate)} tone="open" />
-        <Rate label="clicked" value={percent(stats.clickRate)} tone="click" />
-
-        <div className="flex gap-2">
-          <Link href={`/queue?batch=${batch.id}`}>
-            <Button>Messages</Button>
-          </Link>
-          {canRename && (
-            <Button variant="ghost" onClick={() => onRename(batch)}>
-              Rename
-            </Button>
-          )}
+        {/* The numbers, on their own line and evenly spread. Three equal
+            columns fill the card at any width, where a right-aligned cluster
+            left a hole in the middle of a wide screen. */}
+        <div className="mt-3 grid gap-x-6 gap-y-4 border-t border-border pt-3 sm:grid-cols-3">
+          <Metric
+            label="Emails sent"
+            value={stats.sent.toLocaleString()}
+            detail={
+              queued
+                ? `${queued.toLocaleString()} still queued`
+                : `of ${batch.inserted.toLocaleString()}`
+            }
+            share={progress}
+            tone="accent"
+          />
+          <Metric
+            label="Opened"
+            value={percent(stats.openRate)}
+            detail={`${stats.opened.toLocaleString()} of ${stats.sent.toLocaleString()}`}
+            share={stats.openRate}
+            tone="sent"
+          />
+          <Metric
+            label="Clicked"
+            value={percent(stats.clickRate)}
+            detail={`${stats.clicked.toLocaleString()} of ${stats.sent.toLocaleString()}`}
+            share={stats.clickRate}
+            tone="accent"
+          />
         </div>
       </div>
     </Card>

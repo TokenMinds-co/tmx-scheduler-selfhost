@@ -191,7 +191,7 @@ export default function SuppressionPage() {
             </div>
           }
         >
-          <div className="table-scroll">
+          <div className="table-scroll table-scroll-wide">
             <table className="data-table">
               <thead>
                 <tr>
