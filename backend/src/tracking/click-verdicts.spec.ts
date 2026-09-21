@@ -1,0 +1,107 @@
+import { TrackingService } from './tracking.service';
+
+const BROWSER =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36';
+
+const SENT = new Date('2026-09-18T16:00:00Z');
+const after = (seconds: number) => new Date(SENT.getTime() + seconds * 1000);
+
+interface StoredClick {
+  emailId: string;
+  delaySeconds: number;
+  burstSize: number;
+  userAgent: string | null;
+  ptr: string | null;
+  occurredAt: Date;
+}
+
+function click(
+  emailId: string,
+  delaySeconds: number,
+  overrides: Partial<StoredClick> = {},
+): StoredClick {
+  return {
+    emailId,
+    delaySeconds,
+    burstSize: 1,
+    userAgent: BROWSER,
+    ptr: 'cpe-1-2-3-4.example-isp.net',
+    occurredAt: after(delaySeconds),
+    ...overrides,
+  };
+}
+
+/** Only `emailEvent.findMany` is touched; the rest of the service is not under test. */
+function serviceOver(events: StoredClick[]): TrackingService {
+  const prisma = { emailEvent: { findMany: async () => events } };
+  return new TrackingService(prisma as never, {} as never, {} as never);
+}
+
+describe('clickVerdicts', () => {
+  it('calls a gateway sweep a scanner: minutes after delivery, never opened', async () => {
+    // The production pattern that prompted this: one tracked link per message,
+    // so no burst, followed from a browser-like agent, so no agent match.
+    const verdicts = await serviceOver([click('a', 90)]).clickVerdicts([
+      { id: 'a', firstOpenAt: null },
+    ]);
+    expect(verdicts.get('a')).toBe('scanner');
+  });
+
+  it('calls the same click human when the message was opened first', async () => {
+    const verdicts = await serviceOver([click('a', 90)]).clickVerdicts([
+      { id: 'a', firstOpenAt: after(60) },
+    ]);
+    expect(verdicts.get('a')).toBe('human');
+  });
+
+  it('does not let an open that came after the click vouch for it', async () => {
+    // Swept on delivery, read by a person an hour later. The open is real; the
+    // click still was not theirs.
+    const verdicts = await serviceOver([click('a', 5)]).clickVerdicts([
+      { id: 'a', firstOpenAt: after(3600) },
+    ]);
+    expect(verdicts.get('a')).toBe('scanner');
+  });
+
+  it('lets one real click outweigh the sweep that preceded it', async () => {
+    const verdicts = await serviceOver([
+      click('a', 4),
+      click('a', 86_400),
+    ]).clickVerdicts([{ id: 'a', firstOpenAt: null }]);
+    expect(verdicts.get('a')).toBe('human');
+  });
+
+  it('is not fooled by the order events come back in', async () => {
+    const verdicts = await serviceOver([
+      click('a', 86_400),
+      click('a', 4),
+    ]).clickVerdicts([{ id: 'a', firstOpenAt: null }]);
+    expect(verdicts.get('a')).toBe('human');
+  });
+
+  it('knows a named gateway whenever it clicks', async () => {
+    const verdicts = await serviceOver([
+      click('a', 7200, { userAgent: 'Mozilla/5.0 SafeLinks' }),
+    ]).clickVerdicts([{ id: 'a', firstOpenAt: after(60) }]);
+    expect(verdicts.get('a')).toBe('scanner');
+  });
+
+  it('judges each message on its own clicks', async () => {
+    const verdicts = await serviceOver([
+      click('swept', 3),
+      click('read', 7200),
+    ]).clickVerdicts([
+      { id: 'swept', firstOpenAt: null },
+      { id: 'read', firstOpenAt: null },
+    ]);
+    expect(verdicts.get('swept')).toBe('scanner');
+    expect(verdicts.get('read')).toBe('human');
+  });
+
+  it('says nothing about a message nobody clicked', async () => {
+    const verdicts = await serviceOver([]).clickVerdicts([
+      { id: 'a', firstOpenAt: null },
+    ]);
+    expect(verdicts.has('a')).toBe(false);
+  });
+});

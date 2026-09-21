@@ -5,7 +5,11 @@ import { AppConfig, CONFIG } from '../config/configuration';
 import { CryptoService } from '../common/crypto.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { judge, rulesFromEnv, type Verdict } from './classify';
-import type { TrackingBreakdown, TrackingStats } from '@ims/shared';
+import type {
+  ClickVerdict,
+  TrackingBreakdown,
+  TrackingStats,
+} from '@ims/shared';
 
 /** A hit, as observed at the endpoint. */
 export interface TrackingHit {
@@ -209,6 +213,49 @@ export class TrackingService {
   // ---------------------------------------------------------------------------
 
   /**
+   * For each message that has been clicked: was any of it a person?
+   *
+   * One counted click makes the message `human`, however many scanner hits
+   * surround it — a gateway sweeping the link on delivery does not un-click the
+   * recipient who followed it the next morning. A message whose every click
+   * failed a check is `scanner`. Messages with no clicks are absent.
+   *
+   * Judged on each call like everything else here, so a moved threshold
+   * re-scores the queue and the batch report together.
+   */
+  async clickVerdicts(
+    emails: { id: string; firstOpenAt: Date | null }[],
+  ): Promise<Map<string, ClickVerdict>> {
+    const verdicts = new Map<string, ClickVerdict>();
+    if (!emails.length) return verdicts;
+
+    const rules = rulesFromEnv();
+    const openedAt = new Map(emails.map((email) => [email.id, email.firstOpenAt]));
+    const events = await this.prisma.emailEvent.findMany({
+      where: { emailId: { in: emails.map((email) => email.id) }, kind: 'click' },
+      select: {
+        emailId: true,
+        delaySeconds: true,
+        burstSize: true,
+        userAgent: true,
+        ptr: true,
+        occurredAt: true,
+      },
+    });
+
+    for (const event of events) {
+      const opened = openedAt.get(event.emailId) ?? null;
+      const { verdict } = judge(
+        { ...event, openedBefore: opened !== null && opened <= event.occurredAt },
+        rules,
+      );
+      if (verdict === 'counted') verdicts.set(event.emailId, 'human');
+      else if (!verdicts.has(event.emailId)) verdicts.set(event.emailId, 'scanner');
+    }
+    return verdicts;
+  }
+
+  /**
    * Engagement for a campaign, judged now rather than when it was recorded.
    *
    * Every hit is re-run through the rules on each call, which is what makes a
@@ -221,9 +268,10 @@ export class TrackingService {
 
     const emails = await this.prisma.queuedEmail.findMany({
       where: { status: 'sent', ...(group ? { group } : {}) },
-      select: { id: true },
+      select: { id: true, firstOpenAt: true },
     });
     const ids = emails.map((email) => email.id);
+    const openedAt = new Map(emails.map((email) => [email.id, email.firstOpenAt]));
     if (!ids.length) return empty(rules);
 
     const events = await this.prisma.emailEvent.findMany({
@@ -235,6 +283,7 @@ export class TrackingService {
         burstSize: true,
         userAgent: true,
         ptr: true,
+        occurredAt: true,
       },
     });
 
@@ -247,7 +296,19 @@ export class TrackingService {
     }));
 
     for (const event of events) {
-      const { verdict, reason } = judge(event, rules);
+      const opened = openedAt.get(event.emailId) ?? null;
+      const { verdict, reason } = judge(
+        {
+          ...event,
+          // Only a click can be "not opened first"; for an open the question
+          // does not arise, and undefined keeps the rule out of it.
+          openedBefore:
+            event.kind === 'click'
+              ? opened !== null && opened <= event.occurredAt
+              : undefined,
+        },
+        rules,
+      );
       const into = event.kind === 'click' ? clicks : opens;
       into.counts[verdict] += 1;
       if (verdict === 'counted') into.people.add(event.emailId);

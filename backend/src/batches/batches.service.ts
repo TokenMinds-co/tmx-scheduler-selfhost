@@ -3,6 +3,7 @@ import type { Batch } from '@prisma/client';
 import { BatchDto, BatchStats, EMAIL_STATUSES, EmailStatus } from '@ims/shared';
 import { ApiException } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
+import { TrackingService } from '../tracking/tracking.service';
 
 /** A batch nothing has been queued under yet, so every read has a shape. */
 function emptyStats(): BatchStats {
@@ -14,6 +15,7 @@ function emptyStats(): BatchStats {
     sent: 0,
     opened: 0,
     clicked: 0,
+    scannerClicks: 0,
     openRate: 0,
     clickRate: 0,
     firstSentAt: null,
@@ -23,7 +25,10 @@ function emptyStats(): BatchStats {
 
 @Injectable()
 export class BatchesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly tracking: TrackingService,
+  ) {}
 
   /** Newest first — the batch someone wants to look at is the last one sent. */
   async list(): Promise<BatchDto[]> {
@@ -70,7 +75,7 @@ export class BatchesService {
     const grouped = await this.prisma.queuedEmail.groupBy({
       by: ['batchId', 'status'],
       where: { batchId: { in: ids } },
-      _count: { _all: true, firstOpenAt: true, firstClickAt: true },
+      _count: { _all: true, firstOpenAt: true },
       _min: { sentAt: true },
       _max: { sentAt: true },
     });
@@ -82,7 +87,6 @@ export class BatchesService {
 
       entry.byStatus[row.status] = row._count._all;
       entry.opened += row._count.firstOpenAt;
-      entry.clicked += row._count.firstClickAt;
 
       const first = row._min.sentAt?.toISOString() ?? null;
       const last = row._max.sentAt?.toISOString() ?? null;
@@ -94,6 +98,24 @@ export class BatchesService {
       }
 
       stats.set(row.batchId, entry);
+    }
+
+    // Clicks cannot come from the grouped count: `firstClickAt` is stamped by
+    // the first hit of any kind, and on mail with a tracked link that is
+    // usually a gateway. Only the clicked messages are fetched, so this stays
+    // proportional to engagement rather than to the size of the batches.
+    const clicked = await this.prisma.queuedEmail.findMany({
+      where: { batchId: { in: ids }, firstClickAt: { not: null } },
+      select: { id: true, batchId: true, firstOpenAt: true },
+    });
+    const verdicts = await this.tracking.clickVerdicts(clicked);
+    for (const email of clicked) {
+      const entry = email.batchId ? stats.get(email.batchId) : undefined;
+      if (!entry) continue;
+      // No events behind a stamped click means the log was pruned; with no
+      // evidence against it, it stays a click.
+      if ((verdicts.get(email.id) ?? 'human') === 'human') entry.clicked += 1;
+      else entry.scannerClicks += 1;
     }
 
     for (const entry of stats.values()) {

@@ -112,6 +112,35 @@ describe('judge', () => {
   });
 });
 
+describe('clicked without opening', () => {
+  // The case the burst rule cannot see: one tracked link per message, followed
+  // by a gateway a minute or two after delivery, with a browser's user-agent.
+  const sweep = { ...human, delaySeconds: 90, openedBefore: false };
+
+  it('suspects a click soon after the send on a message never opened', () => {
+    const result = judge(sweep);
+    expect(result.verdict).toBe('suspect');
+    expect(result.reason).toContain('never opened');
+  });
+
+  it('counts the same click once the message had been opened', () => {
+    expect(judge({ ...sweep, openedBefore: true }).verdict).toBe('counted');
+  });
+
+  it('counts an unopened click that came long after delivery', () => {
+    // Outlook blocks images by default, so a person there clicks with no open
+    // on record. What separates them from a gateway is the clock.
+    expect(
+      judge({ ...sweep, delaySeconds: DEFAULT_RULES.noOpenWindowSeconds })
+        .verdict,
+    ).toBe('counted');
+  });
+
+  it('stays out of the way when nothing is known about opens', () => {
+    expect(judge({ ...human, delaySeconds: 90 }).verdict).toBe('counted');
+  });
+});
+
 describe('rulesFromEnv', () => {
   it('falls back to the defaults when unset', () => {
     expect(rulesFromEnv({})).toEqual(DEFAULT_RULES);
@@ -123,7 +152,11 @@ describe('rulesFromEnv', () => {
         TRACKING_MIN_DELAY_SECONDS: '45',
         TRACKING_BURST_LINKS: '2',
       }),
-    ).toEqual({ minDelaySeconds: 45, burstLinks: 2 });
+    ).toEqual({
+      minDelaySeconds: 45,
+      burstLinks: 2,
+      noOpenWindowSeconds: DEFAULT_RULES.noOpenWindowSeconds,
+    });
   });
 
   it('ignores nonsense rather than disabling the filter', () => {

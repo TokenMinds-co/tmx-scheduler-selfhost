@@ -14,6 +14,14 @@ export interface TrackingRules {
   minDelaySeconds: number;
   /** Distinct links from one message that together mean "scanned, not read". */
   burstLinks: number;
+  /**
+   * How long after the send a click with no open before it is still treated
+   * as a scanner. Wider than `minDelaySeconds` because a gateway that queues
+   * its scan can take a minute or two — and because this rule is the only one
+   * that can catch a sweep of a message carrying a single tracked link, where
+   * a burst is impossible by construction.
+   */
+  noOpenWindowSeconds: number;
 }
 
 export const DEFAULT_RULES: TrackingRules = {
@@ -23,6 +31,7 @@ export const DEFAULT_RULES: TrackingRules = {
   // number chosen for looking tidy.
   minDelaySeconds: 30,
   burstLinks: 3,
+  noOpenWindowSeconds: 300,
 };
 
 /** The evidence a verdict is drawn from. */
@@ -31,6 +40,13 @@ export interface EventEvidence {
   burstSize: number;
   userAgent: string | null;
   ptr: string | null;
+  /**
+   * For a click: whether the message had registered an open by the time the
+   * click arrived. Derived at read time from `firstOpenAt`, so it is evidence
+   * like the rest. Left undefined where it is unknown or the hit is an open,
+   * and the rule that reads it then stays out of the way.
+   */
+  openedBefore?: boolean;
 }
 
 export interface Judgement {
@@ -154,6 +170,23 @@ export function judge(
     };
   }
 
+  // A scanner follows links but never renders the message, so the open pixel
+  // does not fire: clicked within minutes of delivery, never opened, is its
+  // fingerprint. Suspect rather than machine, because it is not proof — Outlook
+  // blocks images by default, and a person there can click with no open on
+  // record. What makes that unlikely is the clock: a stranger reading a cold
+  // message and following its link within minutes of it landing is rare, and a
+  // gateway doing so is what gateways are for.
+  if (
+    evidence.openedBefore === false &&
+    evidence.delaySeconds < rules.noOpenWindowSeconds
+  ) {
+    return {
+      verdict: 'suspect',
+      reason: `clicked ${evidence.delaySeconds}s after send, never opened`,
+    };
+  }
+
   // An empty user-agent is not proof — some privacy tooling strips it — but no
   // ordinary browser omits it.
   if (!evidence.userAgent) {
@@ -180,5 +213,9 @@ export function rulesFromEnv(env: NodeJS.ProcessEnv = process.env): TrackingRule
       DEFAULT_RULES.minDelaySeconds,
     ),
     burstLinks: number('TRACKING_BURST_LINKS', DEFAULT_RULES.burstLinks),
+    noOpenWindowSeconds: number(
+      'TRACKING_NO_OPEN_WINDOW_SECONDS',
+      DEFAULT_RULES.noOpenWindowSeconds,
+    ),
   };
 }
