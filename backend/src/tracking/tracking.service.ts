@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { judge, rulesFromEnv, type Verdict } from './classify';
 import type {
   ClickVerdict,
+  EmailEventDto,
   TrackingBreakdown,
   TrackingStats,
 } from '@ims/shared';
@@ -239,20 +240,108 @@ export class TrackingService {
         burstSize: true,
         userAgent: true,
         ptr: true,
+        ip: true,
         occurredAt: true,
       },
     });
+    const reach = await this.networkReach(events.map((event) => event.ip));
 
     for (const event of events) {
       const opened = openedAt.get(event.emailId) ?? null;
       const { verdict } = judge(
-        { ...event, openedBefore: opened !== null && opened <= event.occurredAt },
+        {
+          ...event,
+          openedBefore: opened !== null && opened <= event.occurredAt,
+          networkReach: reachOf(reach, event.ip),
+        },
         rules,
       );
       if (verdict === 'counted') verdicts.set(event.emailId, 'human');
       else if (!verdicts.has(event.emailId)) verdicts.set(event.emailId, 'scanner');
     }
     return verdicts;
+  }
+
+  /**
+   * Every hit on one message, each with today's verdict and the rule behind it.
+   *
+   * This is what the queue opens when a chip is clicked. A verdict nobody can
+   * inspect is a verdict nobody can correct: when a row of "Clicked" looks
+   * wrong, the fix starts from seeing what those hits actually were.
+   */
+  async eventsFor(emailId: string): Promise<EmailEventDto[]> {
+    const email = await this.prisma.queuedEmail.findUnique({
+      where: { id: emailId },
+      select: { firstOpenAt: true },
+    });
+    if (!email) return [];
+
+    const rules = rulesFromEnv();
+    const events = await this.prisma.emailEvent.findMany({
+      where: { emailId },
+      orderBy: { occurredAt: 'asc' },
+    });
+    const reach = await this.networkReach(
+      events.filter((event) => event.kind === 'click').map((event) => event.ip),
+    );
+
+    return events.map((event) => {
+      const isClick = event.kind === 'click';
+      const { verdict, reason } = judge(
+        {
+          ...event,
+          openedBefore: isClick
+            ? email.firstOpenAt !== null && email.firstOpenAt <= event.occurredAt
+            : undefined,
+          networkReach: isClick ? reachOf(reach, event.ip) : undefined,
+        },
+        rules,
+      );
+      return {
+        id: event.id,
+        kind: event.kind,
+        url: event.url,
+        occurredAt: event.occurredAt.toISOString(),
+        delaySeconds: event.delaySeconds,
+        userAgent: event.userAgent,
+        ip: event.ip,
+        ptr: event.ptr,
+        verdict,
+        reason,
+      };
+    });
+  }
+
+  /**
+   * For each network among `ips`: how many different recipient domains has it
+   * clicked mail for, across the whole log?
+   *
+   * Asked of the database rather than of the events in hand, because the
+   * answer lives in everyone else's rows — a sweep is only visible from above.
+   * One grouped query per read; at campaign volumes the click log is small,
+   * and if it ever is not, `network` wants to become a stored column.
+   */
+  private async networkReach(
+    ips: (string | null)[],
+  ): Promise<Map<string, number>> {
+    const networks = [
+      ...new Set(ips.filter((ip): ip is string => !!ip).map(networkOf)),
+    ];
+    if (!networks.length) return new Map();
+
+    const rows = await this.prisma.$queryRaw<
+      { network: string; domains: bigint }[]
+    >`
+      SELECT e.network,
+             COUNT(DISTINCT split_part(q."toEmail", '@', 2)) AS domains
+        FROM (SELECT "emailId",
+                     regexp_replace("ip", '[.][0-9]+$', '') AS network
+                FROM "email_event"
+               WHERE "kind" = 'click' AND "ip" IS NOT NULL) e
+        JOIN "email_queue" q ON q."id" = e."emailId"
+       WHERE e.network = ANY(${networks})
+       GROUP BY e.network`;
+    return new Map(rows.map((row) => [row.network, Number(row.domains)]));
   }
 
   /**
@@ -283,9 +372,13 @@ export class TrackingService {
         burstSize: true,
         userAgent: true,
         ptr: true,
+        ip: true,
         occurredAt: true,
       },
     });
+    const reach = await this.networkReach(
+      events.filter((event) => event.kind === 'click').map((event) => event.ip),
+    );
 
     const clicks = tally();
     const opens = tally();
@@ -306,6 +399,8 @@ export class TrackingService {
             event.kind === 'click'
               ? opened !== null && opened <= event.occurredAt
               : undefined,
+          networkReach:
+            event.kind === 'click' ? reachOf(reach, event.ip) : undefined,
         },
         rules,
       );
@@ -360,6 +455,22 @@ export class TrackingService {
       return null;
     }
   }
+}
+
+/**
+ * The network a hit came from: the /24 for IPv4, the address itself otherwise.
+ * A gateway rotates through a pool, so the exact address rarely repeats while
+ * its neighbours do. Must agree with the `regexp_replace` in `networkReach`.
+ */
+export function networkOf(ip: string): string {
+  return ip.replace(/[.][0-9]+$/, '');
+}
+
+function reachOf(
+  reach: Map<string, number>,
+  ip: string | null,
+): number | undefined {
+  return ip ? reach.get(networkOf(ip)) : undefined;
 }
 
 interface Tally {

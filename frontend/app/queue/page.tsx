@@ -7,6 +7,7 @@ import type {
   AccountDto,
   AccountStats,
   BatchDto,
+  EmailEventDto,
   EmailDto,
   EmailStatus,
   Paginated,
@@ -71,52 +72,141 @@ const EMPTY_FILTERS: Filters = {
  * them on arrival, so an open is a hint. The tooltip carries the caveat rather
  * than the column, which has no room for it.
  */
-function Engagement({ email }: { email: EmailDto }) {
+function Engagement({
+  email,
+  onInspect,
+}: {
+  email: EmailDto;
+  onInspect: (email: EmailDto) => void;
+}) {
   if (email.status !== 'sent') return <span className="text-muted">—</span>;
 
-  // A person followed the link. Nothing else on the row says more than that.
-  if (email.clickVerdict === 'human') {
-    return (
-      <span
-        className="inline-flex rounded-full bg-sent-soft px-2 py-0.5 text-xs font-medium text-sent"
-        title={`Clicked ${formatDateTime(email.firstClickAt)}`}
-      >
-        Clicked
-      </span>
-    );
-  }
-
-  // The link was followed, but by something that failed the scanner checks —
-  // a mail gateway testing it on delivery. Shown rather than hidden, and shown
-  // beside any open, because the open may well still be a person.
-  const scanner = email.clickVerdict === 'scanner' && (
+  // Both chips when both apply. The cell used to show a click *instead of* an
+  // open, which made "Clicked" on its own unreadable: clicked without opening,
+  // or opened with the open hidden behind the click?
+  const opened = email.firstOpenAt && (
     <span
-      className="inline-flex rounded-full bg-cancelled-soft px-2 py-0.5 text-xs font-medium text-cancelled"
-      title={`The link was fetched ${formatDateTime(
-        email.firstClickAt,
-      )} by what looks like a security scanner, not a person — too soon after delivery, never opened, or from a known gateway. It is not counted as a click.`}
+      className="inline-flex rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent"
+      title={`Opened ${formatDateTime(
+        email.firstOpenAt,
+      )} — opens are unreliable: many mail clients fetch images before anyone reads the message`}
     >
-      Scanner
+      Opened
     </span>
   );
 
-  if (email.firstOpenAt) {
-    return (
+  // Only a click that passed the scanner checks. A gateway following the link
+  // is not engagement, so it is not drawn at all — the row reads exactly as it
+  // would had the scan never happened.
+  const clicked = email.clickVerdict === 'human' && (
+    <span
+      className="inline-flex rounded-full bg-sent-soft px-2 py-0.5 text-xs font-medium text-sent"
+      title={`Clicked ${formatDateTime(email.firstClickAt)}`}
+    >
+      Clicked
+    </span>
+  );
+
+  const body =
+    opened || clicked ? (
       <>
-        <span
-          className="inline-flex rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent"
-          title={`Opened ${formatDateTime(
-            email.firstOpenAt,
-          )} — opens are unreliable: many mail clients fetch images before anyone reads the message`}
-        >
-          Opened
-        </span>
-        {scanner}
+        {opened}
+        {clicked}
       </>
+    ) : (
+      <span className="text-xs text-muted">No activity</span>
     );
+
+  // Anything with hits behind it opens the log, filtered ones included: that
+  // is where a verdict can be checked when a row looks wrong.
+  if (!email.firstOpenAt && !email.firstClickAt) return body;
+  return (
+    <button
+      type="button"
+      onClick={() => onInspect(email)}
+      title="See every open and click on this message"
+      className="inline-flex flex-wrap items-center gap-1.5 rounded-full transition hover:opacity-75"
+    >
+      {body}
+    </button>
+  );
+}
+
+/** "45s", "12m", "3h 05m", "2d" — how long after the send a hit arrived. */
+function formatDelay(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+  if (seconds < 86_400) {
+    const minutes = Math.floor((seconds % 3600) / 60);
+    return `${Math.floor(seconds / 3600)}h ${String(minutes).padStart(2, '0')}m`;
+  }
+  return `${Math.floor(seconds / 86_400)}d`;
+}
+
+const VERDICT_LABEL: Record<EmailEventDto['verdict'], string> = {
+  counted: 'Person',
+  machine: 'Scanner',
+  suspect: 'Likely scanner',
+};
+
+/**
+ * Every hit on one message, with its verdict and the rule behind it.
+ *
+ * The queue itself says nothing about scanners, on purpose. This is the one
+ * place they are named — so that when a number looks wrong, what was counted
+ * and what was thrown away can be read off rather than guessed at.
+ */
+function ActivityLog({ email }: { email: EmailDto }) {
+  const events = useSWR<EmailEventDto[]>(
+    `/tracking/emails/${email.id}/events`,
+    fetcher,
+  );
+
+  if (events.error) return <Alert>{(events.error as Error).message}</Alert>;
+  if (!events.data) return <Spinner />;
+  if (!events.data.length) {
+    return <p className="text-sm text-muted">Nothing has been recorded.</p>;
   }
 
-  return scanner || <span className="text-xs text-muted">No activity</span>;
+  return (
+    <ul className="max-h-[60vh] space-y-2 overflow-y-auto">
+      {events.data.map((event) => (
+        <li
+          key={event.id}
+          className={cx(
+            'rounded-lg border border-border p-2.5 text-xs',
+            event.verdict !== 'counted' && 'bg-canvas',
+          )}
+        >
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="font-medium capitalize">{event.kind}</span>
+            <span className="tabular-nums text-muted">
+              {formatDelay(event.delaySeconds)} after send ·{' '}
+              {formatShort(event.occurredAt)}
+            </span>
+            <span
+              className={cx(
+                'ml-auto rounded-full px-2 py-0.5 font-medium',
+                event.verdict === 'counted'
+                  ? 'bg-sent-soft text-sent'
+                  : 'bg-cancelled-soft text-cancelled',
+              )}
+            >
+              {VERDICT_LABEL[event.verdict]}
+            </span>
+          </div>
+          <div className="mt-1 text-muted">{event.reason}</div>
+          <div className="mt-1 truncate text-muted" title={event.userAgent ?? ''}>
+            {event.userAgent ?? 'no user agent'}
+          </div>
+          <div className="truncate text-muted">
+            {event.ip ?? 'no address'}
+            {event.ptr && <> · {event.ptr}</>}
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 /**
@@ -183,6 +273,8 @@ function QueueView() {
   // expanded it pushed the queue itself — the reason the page exists — below
   // the fold on a laptop. The summary keeps what would make someone look.
   const [mailboxesOpen, setMailboxesOpen] = useState(false);
+  // The message whose opens and clicks are being inspected.
+  const [inspecting, setInspecting] = useState<EmailDto | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -743,7 +835,7 @@ function QueueView() {
                   <td className="max-w-xs">
                     <div className="flex flex-wrap items-center gap-1.5">
                       <StatusBadge status={email.status} />
-                      <Engagement email={email} />
+                      <Engagement email={email} onInspect={setInspecting} />
                     </div>
                     {email.attempts > 1 && (
                       <div className="mt-0.5 text-xs text-muted">
@@ -824,6 +916,24 @@ function QueueView() {
           />
         )}
       </Card>
+
+      <Dialog
+        open={inspecting !== null}
+        onClose={() => setInspecting(null)}
+        title="Opens and clicks"
+        description={
+          inspecting && (
+            <>
+              Every hit on the message to{' '}
+              <span className="font-medium text-ink">{inspecting.toEmail}</span>,
+              and whether it was counted.
+            </>
+          )
+        }
+        footer={<Button onClick={() => setInspecting(null)}>Close</Button>}
+      >
+        {inspecting && <ActivityLog email={inspecting} />}
+      </Dialog>
 
       <Dialog
         open={rescheduling !== null}

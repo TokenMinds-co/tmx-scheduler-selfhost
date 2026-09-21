@@ -141,6 +141,30 @@ describe('clicked without opening', () => {
   });
 });
 
+describe('a network that clicks for everyone', () => {
+  // The scanner the other rules cannot see: it waits ten minutes, wears a
+  // browser's user-agent, and the message may even have been "opened" by the
+  // same gateway. What it cannot hide is that one machine room is following
+  // the links in mail addressed to unrelated companies.
+  const patient = { ...human, delaySeconds: 600, openedBefore: true };
+
+  it('rejects a hit from a network seen across several companies', () => {
+    const result = judge({ ...patient, networkReach: 3 });
+    expect(result.verdict).toBe('machine');
+    expect(result.reason).toContain('3 companies');
+  });
+
+  it('counts a network that has only clicked for one or two', () => {
+    // Two is a person who reads their work mail at home, or two colleagues on
+    // a shared connection whose company uses two domains.
+    expect(judge({ ...patient, networkReach: 2 }).verdict).toBe('counted');
+  });
+
+  it('stays out of the way when the network is unknown', () => {
+    expect(judge(patient).verdict).toBe('counted');
+  });
+});
+
 describe('rulesFromEnv', () => {
   it('falls back to the defaults when unset', () => {
     expect(rulesFromEnv({})).toEqual(DEFAULT_RULES);
@@ -156,6 +180,7 @@ describe('rulesFromEnv', () => {
       minDelaySeconds: 45,
       burstLinks: 2,
       noOpenWindowSeconds: DEFAULT_RULES.noOpenWindowSeconds,
+      networkReach: DEFAULT_RULES.networkReach,
     });
   });
 

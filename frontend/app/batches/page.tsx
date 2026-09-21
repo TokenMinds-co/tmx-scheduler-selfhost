@@ -183,14 +183,9 @@ function BatchCard({
           <Metric
             label="Clicked"
             value={percent(stats.clickRate)}
-            // People only. Gateway hits are named beside the number rather
-            // than folded into it or silently dropped.
-            detail={
-              `${stats.clicked.toLocaleString()} of ${stats.sent.toLocaleString()}` +
-              (stats.scannerClicks
-                ? ` · ${stats.scannerClicks.toLocaleString()} scanner filtered`
-                : '')
-            }
+            // People only. A gateway following the link is not a click, so
+            // it is neither counted nor mentioned.
+            detail={`${stats.clicked.toLocaleString()} of ${stats.sent.toLocaleString()}`}
             share={stats.clickRate}
             tone="accent"
           />
