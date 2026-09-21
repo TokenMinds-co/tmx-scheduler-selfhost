@@ -288,6 +288,26 @@ export interface SessionUserDto {
 // Batches
 // ---------------------------------------------------------------------------
 
+/**
+ * One open or click as it arrived, with the verdict it gets today and the rule
+ * that decided it. This is the evidence behind a chip in the queue: when a row
+ * looks wrong, this is what says why it was judged the way it was.
+ */
+export interface EmailEventDto {
+  id: string;
+  kind: 'open' | 'click';
+  url: string | null;
+  occurredAt: string;
+  /** Seconds between the send and this hit. */
+  delaySeconds: number;
+  userAgent: string | null;
+  ip: string | null;
+  /** Reverse DNS of the ip, when it has one. */
+  ptr: string | null;
+  verdict: 'counted' | 'machine' | 'suspect';
+  reason: string;
+}
+
 /** Whether the clicks on a message came from a person or a link scanner. */
 export type ClickVerdict = 'human' | 'scanner';
 
@@ -435,6 +455,7 @@ export interface TrackingStats {
     minDelaySeconds: number;
     burstLinks: number;
     noOpenWindowSeconds: number;
+    networkReach: number;
   };
 }
 

@@ -1,4 +1,4 @@
-import { Controller, Get, Header, Query, Req, Res } from '@nestjs/common';
+import { Controller, Get, Header, Param, Query, Req, Res } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { Public } from '../auth/jwt-auth.guard';
@@ -125,5 +125,11 @@ export class TrackingReportController {
   @Get('stats')
   stats(@Query('group') group?: string) {
     return this.tracking.stats(group?.trim() || undefined);
+  }
+
+  /** Every hit on one message, judged — the evidence behind a queue chip. */
+  @Get('emails/:id/events')
+  events(@Param('id') id: string) {
+    return this.tracking.eventsFor(id);
   }
 }

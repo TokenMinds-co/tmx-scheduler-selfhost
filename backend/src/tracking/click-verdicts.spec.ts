@@ -7,6 +7,7 @@ const SENT = new Date('2026-09-18T16:00:00Z');
 const after = (seconds: number) => new Date(SENT.getTime() + seconds * 1000);
 
 interface StoredClick {
+  ip?: string | null;
   emailId: string;
   delaySeconds: number;
   burstSize: number;
@@ -31,9 +32,23 @@ function click(
   };
 }
 
-/** Only `emailEvent.findMany` is touched; the rest of the service is not under test. */
-function serviceOver(events: StoredClick[]): TrackingService {
-  const prisma = { emailEvent: { findMany: async () => events } };
+/**
+ * Only the event read and the network-reach query are touched; the rest of the
+ * service is not under test. `reach` stands in for the database's answer to
+ * "how many companies' mail has this network clicked".
+ */
+function serviceOver(
+  events: StoredClick[],
+  reach: Record<string, number> = {},
+): TrackingService {
+  const prisma = {
+    emailEvent: { findMany: async () => events },
+    $queryRaw: async () =>
+      Object.entries(reach).map(([network, domains]) => ({
+        network,
+        domains: BigInt(domains),
+      })),
+  };
   return new TrackingService(prisma as never, {} as never, {} as never);
 }
 
@@ -96,6 +111,25 @@ describe('clickVerdicts', () => {
     ]);
     expect(verdicts.get('swept')).toBe('scanner');
     expect(verdicts.get('read')).toBe('human');
+  });
+
+  it('calls a patient scanner a scanner by the company it keeps', async () => {
+    // Ten minutes after delivery, a browser's agent, the message even shows an
+    // open — every older rule passes it. But its /24 has followed the links in
+    // mail to five unrelated companies.
+    const verdicts = await serviceOver(
+      [click('a', 600, { ip: '40.94.31.17' })],
+      { '40.94.31': 5 },
+    ).clickVerdicts([{ id: 'a', firstOpenAt: after(30) }]);
+    expect(verdicts.get('a')).toBe('scanner');
+  });
+
+  it('leaves a person alone on a network that is only theirs', async () => {
+    const verdicts = await serviceOver(
+      [click('a', 600, { ip: '73.12.8.200' })],
+      { '73.12.8': 1 },
+    ).clickVerdicts([{ id: 'a', firstOpenAt: after(30) }]);
+    expect(verdicts.get('a')).toBe('human');
   });
 
   it('says nothing about a message nobody clicked', async () => {

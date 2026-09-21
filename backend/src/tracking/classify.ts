@@ -22,6 +22,14 @@ export interface TrackingRules {
    * a burst is impossible by construction.
    */
   noOpenWindowSeconds: number;
+  /**
+   * How many different companies' mail one network may click before it is a
+   * scanner. A person's connection only ever follows the links in their own
+   * mail; a gateway's address pool follows the links in everybody's. It is the
+   * one signal a scanner cannot dress up — it can wait ten minutes and wear a
+   * browser's user-agent, but it cannot help being the same machine room.
+   */
+  networkReach: number;
 }
 
 export const DEFAULT_RULES: TrackingRules = {
@@ -32,6 +40,7 @@ export const DEFAULT_RULES: TrackingRules = {
   minDelaySeconds: 30,
   burstLinks: 3,
   noOpenWindowSeconds: 300,
+  networkReach: 3,
 };
 
 /** The evidence a verdict is drawn from. */
@@ -47,6 +56,13 @@ export interface EventEvidence {
    * and the rule that reads it then stays out of the way.
    */
   openedBefore?: boolean;
+  /**
+   * Distinct recipient domains whose mail has been clicked from this hit's
+   * network (the /24, for IPv4). Counted at read time across the whole log,
+   * so it sharpens as a campaign goes out. Domains rather than recipients:
+   * colleagues behind one office connection are one company, not a sweep.
+   */
+  networkReach?: number;
 }
 
 export interface Judgement {
@@ -170,6 +186,16 @@ export function judge(
     };
   }
 
+  if (
+    evidence.networkReach !== undefined &&
+    evidence.networkReach >= rules.networkReach
+  ) {
+    return {
+      verdict: 'machine',
+      reason: `same network clicked mail to ${evidence.networkReach} companies`,
+    };
+  }
+
   // A scanner follows links but never renders the message, so the open pixel
   // does not fire: clicked within minutes of delivery, never opened, is its
   // fingerprint. Suspect rather than machine, because it is not proof — Outlook
@@ -217,5 +243,6 @@ export function rulesFromEnv(env: NodeJS.ProcessEnv = process.env): TrackingRule
       'TRACKING_NO_OPEN_WINDOW_SECONDS',
       DEFAULT_RULES.noOpenWindowSeconds,
     ),
+    networkReach: number('TRACKING_NETWORK_REACH', DEFAULT_RULES.networkReach),
   };
 }
