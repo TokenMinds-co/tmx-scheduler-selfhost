@@ -74,21 +74,41 @@ const EMPTY_FILTERS: Filters = {
 function Engagement({ email }: { email: EmailDto }) {
   if (email.status !== 'sent') return <span className="text-muted">—</span>;
 
-  // A person followed the link. Nothing else on the row says more than that.
-  if (email.clickVerdict === 'human') {
-    return (
-      <span
-        className="inline-flex rounded-full bg-sent-soft px-2 py-0.5 text-xs font-medium text-sent"
-        title={`Clicked ${formatDateTime(email.firstClickAt)}`}
-      >
-        Clicked
-      </span>
-    );
-  }
+  // Every chip that applies is drawn, side by side. The cell used to show a
+  // click *instead of* an open, which made "Clicked" on its own unreadable: it
+  // could mean clicked without opening — the mark of a scanner — or simply that
+  // the open was hidden behind the click. Those are opposite conclusions, and
+  // the row has to let them be told apart.
+  const opened = email.firstOpenAt && (
+    <span
+      className="inline-flex rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent"
+      title={`Opened ${formatDateTime(
+        email.firstOpenAt,
+      )} — opens are unreliable: many mail clients fetch images before anyone reads the message`}
+    >
+      Opened
+    </span>
+  );
+
+  const clicked = email.clickVerdict === 'human' && (
+    <span
+      className="inline-flex rounded-full bg-sent-soft px-2 py-0.5 text-xs font-medium text-sent"
+      title={
+        `Clicked ${formatDateTime(email.firstClickAt)}` +
+        // Said out loud when it applies, because it is the case that looks
+        // like a bug: the click passed every scanner check, but no open was
+        // ever recorded. Usually a mail client that blocks images.
+        (email.firstOpenAt
+          ? ''
+          : ' — no open was recorded. Outlook and some other clients block images, so a person can click without one; the click came long enough after delivery to pass the scanner checks')
+      }
+    >
+      Clicked
+    </span>
+  );
 
   // The link was followed, but by something that failed the scanner checks —
-  // a mail gateway testing it on delivery. Shown rather than hidden, and shown
-  // beside any open, because the open may well still be a person.
+  // a mail gateway testing it on delivery. Shown rather than hidden.
   const scanner = email.clickVerdict === 'scanner' && (
     <span
       className="inline-flex rounded-full bg-cancelled-soft px-2 py-0.5 text-xs font-medium text-cancelled"
@@ -100,23 +120,16 @@ function Engagement({ email }: { email: EmailDto }) {
     </span>
   );
 
-  if (email.firstOpenAt) {
-    return (
-      <>
-        <span
-          className="inline-flex rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent"
-          title={`Opened ${formatDateTime(
-            email.firstOpenAt,
-          )} — opens are unreliable: many mail clients fetch images before anyone reads the message`}
-        >
-          Opened
-        </span>
-        {scanner}
-      </>
-    );
+  if (!opened && !clicked && !scanner) {
+    return <span className="text-xs text-muted">No activity</span>;
   }
-
-  return scanner || <span className="text-xs text-muted">No activity</span>;
+  return (
+    <>
+      {opened}
+      {clicked}
+      {scanner}
+    </>
+  );
 }
 
 /**
