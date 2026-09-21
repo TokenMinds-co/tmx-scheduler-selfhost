@@ -74,7 +74,8 @@ const EMPTY_FILTERS: Filters = {
 function Engagement({ email }: { email: EmailDto }) {
   if (email.status !== 'sent') return <span className="text-muted">—</span>;
 
-  if (email.firstClickAt) {
+  // A person followed the link. Nothing else on the row says more than that.
+  if (email.clickVerdict === 'human') {
     return (
       <span
         className="inline-flex rounded-full bg-sent-soft px-2 py-0.5 text-xs font-medium text-sent"
@@ -85,20 +86,37 @@ function Engagement({ email }: { email: EmailDto }) {
     );
   }
 
+  // The link was followed, but by something that failed the scanner checks —
+  // a mail gateway testing it on delivery. Shown rather than hidden, and shown
+  // beside any open, because the open may well still be a person.
+  const scanner = email.clickVerdict === 'scanner' && (
+    <span
+      className="inline-flex rounded-full bg-cancelled-soft px-2 py-0.5 text-xs font-medium text-cancelled"
+      title={`The link was fetched ${formatDateTime(
+        email.firstClickAt,
+      )} by what looks like a security scanner, not a person — too soon after delivery, never opened, or from a known gateway. It is not counted as a click.`}
+    >
+      Scanner
+    </span>
+  );
+
   if (email.firstOpenAt) {
     return (
-      <span
-        className="inline-flex rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent"
-        title={`Opened ${formatDateTime(
-          email.firstOpenAt,
-        )} — opens are unreliable: many mail clients fetch images before anyone reads the message`}
-      >
-        Opened
-      </span>
+      <>
+        <span
+          className="inline-flex rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent"
+          title={`Opened ${formatDateTime(
+            email.firstOpenAt,
+          )} — opens are unreliable: many mail clients fetch images before anyone reads the message`}
+        >
+          Opened
+        </span>
+        {scanner}
+      </>
     );
   }
 
-  return <span className="text-xs text-muted">No activity</span>;
+  return scanner || <span className="text-xs text-muted">No activity</span>;
 }
 
 /**

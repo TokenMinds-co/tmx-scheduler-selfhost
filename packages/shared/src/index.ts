@@ -246,6 +246,14 @@ export interface EmailDto {
   /** First open and click, or null. Populated only for tracked campaign mail. */
   firstOpenAt: string | null;
   firstClickAt: string | null;
+  /**
+   * Who the clicks on this message were, judged now: `human` when at least one
+   * passed every scanner check, `scanner` when none did, null when there has
+   * been no click. `firstClickAt` alone cannot say — it is stamped by the
+   * first hit of any kind, and a mail gateway follows links before a person
+   * ever sees the message.
+   */
+  clickVerdict: ClickVerdict | null;
   batchId: string | null;
   importBatchId: string | null;
   createdAt: string;
@@ -280,6 +288,9 @@ export interface SessionUserDto {
 // Batches
 // ---------------------------------------------------------------------------
 
+/** Whether the clicks on a message came from a person or a link scanner. */
+export type ClickVerdict = 'human' | 'scanner';
+
 /** Enough of a batch to name it in a sentence. */
 export interface BatchRef {
   id: string;
@@ -294,11 +305,16 @@ export interface BatchRef {
  * through sending would otherwise report an open rate against mail that has
  * not gone out yet, and read as failing when it is simply not finished.
  *
- * Opens and clicks are counted raw — one per recipient who registered either,
- * which is what every mail platform means by the word. Scanner traffic inflates
- * opens badly on cold B2B; the event log keeps the evidence to tell them apart
- * (see `TrackingStats`), and this is deliberately the unfiltered number that
- * lines up with what other tools report.
+ * Opens are counted raw, one per recipient, which is what every mail platform
+ * means by the word — and filtering them would erase Gmail entirely, since
+ * every Gmail open arrives through Google's image proxy.
+ *
+ * Clicks are not raw. They were, until the first campaign with a tracked link
+ * in every message showed what raw costs: mail gateways follow each link on
+ * delivery, and a batch's click rate became mostly a measure of how many
+ * recipients sit behind one. `clicked` is recipients with a click that passed
+ * the scanner checks; the rest are in `scannerClicks`, counted and shown
+ * rather than dropped, so the filter can be seen working.
  */
 export interface BatchStats {
   byStatus: Record<EmailStatus, number>;
@@ -306,6 +322,8 @@ export interface BatchStats {
   sent: number;
   opened: number;
   clicked: number;
+  /** Recipients whose every click was judged a scanner's. */
+  scannerClicks: number;
   /** Shares of `sent`, 0–1. Zero until something has been sent. */
   openRate: number;
   clickRate: number;
@@ -413,7 +431,11 @@ export interface TrackingStats {
   /** Why hits were rejected, commonest first. */
   reasons: { reason: string; hits: number }[];
   /** The thresholds these numbers were judged against. */
-  rules: { minDelaySeconds: number; burstLinks: number };
+  rules: {
+    minDelaySeconds: number;
+    burstLinks: number;
+    noOpenWindowSeconds: number;
+  };
 }
 
 export interface QueueStats {

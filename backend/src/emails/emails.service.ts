@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Prisma, type QueuedEmail } from '@prisma/client';
 import {
   AccountStats,
+  ClickVerdict,
   EmailDto,
   EmailStatus,
   Paginated,
@@ -11,6 +12,7 @@ import { AppConfig, CONFIG } from '../config/configuration';
 import { ApiException } from '../common/errors';
 import { sentTodayOf } from '../accounts/daily-counter';
 import { PrismaService } from '../prisma/prisma.service';
+import { TrackingService } from '../tracking/tracking.service';
 
 export interface QueueFilter {
   status?: EmailStatus[];
@@ -31,6 +33,7 @@ export class EmailsService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly tracking: TrackingService,
     @Inject(CONFIG) private readonly config: AppConfig,
   ) {}
 
@@ -53,11 +56,25 @@ export class EmailsService {
       }),
       this.prisma.queuedEmail.count({ where }),
     ]);
-    return { items: items.map(toDto), total, page, pageSize };
+    // Judged for the page on screen only — a handful of rows, and only the
+    // ones that were clicked at all.
+    const verdicts = await this.tracking.clickVerdicts(
+      items.filter((email) => email.firstClickAt),
+    );
+    return {
+      items: items.map((email) => toDto(email, verdicts.get(email.id))),
+      total,
+      page,
+      pageSize,
+    };
   }
 
   async get(id: string): Promise<EmailDto> {
-    return toDto(await this.findOrThrow(id));
+    const email = await this.findOrThrow(id);
+    const verdicts = await this.tracking.clickVerdicts(
+      email.firstClickAt ? [email] : [],
+    );
+    return toDto(email, verdicts.get(email.id));
   }
 
   async groups(): Promise<string[]> {
@@ -406,7 +423,16 @@ export class EmailsService {
   }
 }
 
-export function toDto(email: QueuedEmail): EmailDto {
+/**
+ * `clickVerdict` is passed in rather than looked up, because judging needs the
+ * event log and this is a plain mapper. The write paths omit it: cancelling,
+ * rescheduling and retrying all act on mail that has not been delivered, which
+ * nobody can have clicked.
+ */
+export function toDto(
+  email: QueuedEmail,
+  clickVerdict: ClickVerdict | null = null,
+): EmailDto {
   return {
     id: email.id,
     accountId: email.accountId,
@@ -428,6 +454,7 @@ export function toDto(email: QueuedEmail): EmailDto {
     claimedAt: email.claimedAt?.toISOString() ?? null,
     firstOpenAt: email.firstOpenAt?.toISOString() ?? null,
     firstClickAt: email.firstClickAt?.toISOString() ?? null,
+    clickVerdict,
     batchId: email.batchId,
     importBatchId: email.importBatchId,
     createdAt: email.createdAt.toISOString(),
