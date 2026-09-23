@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Prisma, type Account } from '@prisma/client';
+import { Signature, Prisma, type Account } from '@prisma/client';
 import { DateTime } from 'luxon';
 import { AccountDto, PROVIDER_PRESETS } from '@ims/shared';
 import { ApiException } from '../common/errors';
@@ -70,9 +70,16 @@ export class AccountsService {
     return account;
   }
 
-  async findByEmail(email: string): Promise<Account | null> {
+  /**
+   * With its signature, because the import asks whether each message will
+   * carry a link the tracker can follow, and the P.s. lives on the signature.
+   */
+  async findByEmail(
+    email: string,
+  ): Promise<(Account & { signature: Signature | null }) | null> {
     return this.prisma.account.findUnique({
       where: { email: email.toLowerCase().trim() },
+      include: { signature: true },
     });
   }
 

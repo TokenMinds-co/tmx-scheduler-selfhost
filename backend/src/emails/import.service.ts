@@ -5,6 +5,7 @@ import { BatchRef, ImportResult, ImportRowError } from '@ims/shared';
 import { ApiException } from '../common/errors';
 import { dedupeKey } from '../common/crypto.service';
 import { sanitizeMessageHtml } from '../common/html';
+import { hasTrackableLink } from '../mail/trackable';
 import { SuppressionService } from '../suppression/suppression.service';
 import { AccountsService } from '../accounts/accounts.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -129,6 +130,11 @@ export class ImportService {
     const seenKeys = new Set<string>();
     let skippedDuplicates = 0;
 
+    // Messages that will never register a click, and the mailboxes to blame.
+    // Counted after dedupe, so the number is of rows that would be queued.
+    let untrackedRows = 0;
+    const untrackedMailboxes = new Set<string>();
+
     for (const [index, row] of rows.entries()) {
       const rowNumber = index + 1;
       const fail = (reason: string) =>
@@ -209,6 +215,17 @@ export class ImportService {
       }
       seenKeys.add(key);
 
+      if (
+        !hasTrackableLink({
+          bodyText: row.message,
+          bodyHtml,
+          signatureHtml: account.signature?.html,
+        })
+      ) {
+        untrackedRows += 1;
+        untrackedMailboxes.add(account.email);
+      }
+
       candidates.push({
         row: rowNumber,
         doc: {
@@ -231,6 +248,11 @@ export class ImportService {
       });
     }
 
+    const untracked = {
+      rows: untrackedRows,
+      mailboxes: [...untrackedMailboxes].sort(),
+    };
+
     if (options.dryRun) {
       return {
         batch: null,
@@ -239,6 +261,7 @@ export class ImportService {
         skippedDuplicates,
         skippedSuppressed,
         errors,
+        untracked,
         dryRun: true,
       };
     }
@@ -268,6 +291,7 @@ export class ImportService {
       skippedDuplicates,
       skippedSuppressed,
       errors,
+      untracked,
       dryRun: false,
     };
   }

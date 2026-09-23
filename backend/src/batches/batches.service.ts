@@ -4,6 +4,7 @@ import { BatchDto, BatchStats, EMAIL_STATUSES, EmailStatus } from '@ims/shared';
 import { ApiException } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
 import { TrackingService } from '../tracking/tracking.service';
+import { signatureCallToAction } from '../mail/trackable';
 
 /** A batch nothing has been queued under yet, so every read has a shape. */
 function emptyStats(): BatchStats {
@@ -16,6 +17,8 @@ function emptyStats(): BatchStats {
     opened: 0,
     clicked: 0,
     scannerClicks: 0,
+    clickFetches: 0,
+    untracked: 0,
     openRate: 0,
     clickRate: 0,
     firstSentAt: null,
@@ -118,6 +121,19 @@ export class BatchesService {
       else entry.scannerClicks += 1;
     }
 
+    const [fetches, untracked] = await Promise.all([
+      this.clickFetches(ids),
+      this.untracked(ids),
+    ]);
+    for (const [batchId, count] of fetches) {
+      const entry = stats.get(batchId);
+      if (entry) entry.clickFetches = count;
+    }
+    for (const [batchId, count] of untracked) {
+      const entry = stats.get(batchId);
+      if (entry) entry.untracked = count;
+    }
+
     for (const entry of stats.values()) {
       entry.sent = entry.byStatus.sent;
       // Rates are of what went out, so a batch still sending reports against
@@ -127,7 +143,67 @@ export class BatchesService {
     }
     return stats;
   }
+
+  /** Every click hit on each batch's mail, whatever the verdict. */
+  private async clickFetches(ids: string[]): Promise<Map<string, number>> {
+    const rows = await this.prisma.$queryRaw<Counted>`
+      SELECT q."batchId"::text AS "batchId", COUNT(*) AS n
+        FROM "email_event" e
+        JOIN "email_queue" q ON q."id" = e."emailId"
+       WHERE e."kind" = 'click' AND q."batchId"::text = ANY(${ids})
+       GROUP BY q."batchId"`;
+    return new Map(rows.map((row) => [row.batchId, Number(row.n)]));
+  }
+
+  /**
+   * Per batch, how many messages carry no link the tracker can follow.
+   *
+   * The signature half is judged against each mailbox as it is configured
+   * now, not as it was at send time — the sent message is not stored, only
+   * its body. That is the useful reading anyway: it says whether the fix has
+   * been made, and a batch sent before it was still reads as unclickable.
+   * The body half mirrors `hasTrackableLink`, in SQL so the bodies stay in
+   * the database.
+   */
+  private async untracked(ids: string[]): Promise<Map<string, number>> {
+    const senders = await this.prisma.queuedEmail.findMany({
+      where: { batchId: { in: ids } },
+      distinct: ['accountId'],
+      select: { accountId: true },
+    });
+    if (!senders.length) return new Map();
+
+    const accounts = await this.prisma.account.findMany({
+      where: { id: { in: senders.map((row) => row.accountId) } },
+      include: { signature: true },
+    });
+    const withCta = new Set(
+      accounts
+        .filter((account) => signatureCallToAction(account.signature?.html))
+        .map((account) => account.id),
+    );
+    // A deleted mailbox has no signature at all, so it counts as none.
+    const withoutCta = senders
+      .map((row) => row.accountId)
+      .filter((id) => !withCta.has(id));
+    if (!withoutCta.length) return new Map();
+
+    const rows = await this.prisma.$queryRaw<Counted>`
+      SELECT q."batchId"::text AS "batchId", COUNT(*) AS n
+        FROM "email_queue" q
+       WHERE q."batchId"::text = ANY(${ids})
+         AND q."accountId"::text = ANY(${withoutCta})
+         AND NOT (COALESCE(q."bodyHtml", '') <> ''
+                  AND q."bodyHtml" ~* 'href="https?://')
+         AND NOT (COALESCE(q."bodyHtml", '') = ''
+                  AND q."bodyText" ~* 'https?://[^[:space:]<>"'']')
+       GROUP BY q."batchId"`;
+    return new Map(rows.map((row) => [row.batchId, Number(row.n)]));
+  }
 }
+
+/** Raw counts per batch id — a grouped query's rows, with the bigint made a number. */
+type Counted = { batchId: string; n: bigint }[];
 
 function toDto(batch: Batch, stats: BatchStats | undefined): BatchDto {
   return {

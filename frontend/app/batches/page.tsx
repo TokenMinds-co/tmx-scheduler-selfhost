@@ -59,15 +59,18 @@ function Metric({
   detail,
   share,
   tone,
+  title,
 }: {
   label: string;
   value: string;
   detail: string;
   share: number;
   tone: 'accent' | 'sent';
+  /** What the number is made of, for whoever hovers to ask. */
+  title?: string;
 }) {
   return (
-    <div className="min-w-0">
+    <div className="min-w-0" title={title}>
       <div className="flex items-baseline gap-2">
         <span className="text-xl font-semibold tabular-nums">{value}</span>
         <span className="truncate text-xs text-muted">{detail}</span>
@@ -142,6 +145,22 @@ function BatchCard({
                 <> · last send {formatShort(stats.lastSentAt)}</>
               )}
             </p>
+
+            {/* A 0% that is not a result but a configuration: the mail has
+                nothing to click. Judged against the mailboxes as they are
+                set up now, so it clears once the signature is fixed. */}
+            {stats.untracked > 0 && (
+              <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-md bg-pending-soft px-2 py-1 text-xs text-pending">
+                <Icon className="size-3.5 shrink-0">{ICONS.alert}</Icon>
+                <span>
+                  {stats.untracked === batch.inserted
+                    ? 'No message in this batch carries'
+                    : `${stats.untracked.toLocaleString()} of ${batch.inserted.toLocaleString()} messages carry no`}{' '}
+                  link that can be tracked — clicks cannot be recorded for them.
+                  Check the mailbox’s P.S. link.
+                </span>
+              </p>
+            )}
           </div>
 
           <div className="flex shrink-0 items-center gap-1">
@@ -188,6 +207,19 @@ function BatchCard({
             detail={`${stats.clicked.toLocaleString()} of ${stats.sent.toLocaleString()}`}
             share={stats.clickRate}
             tone="accent"
+            // Whether the link is even being reached, for anyone who asks why
+            // a rate is zero: fetches of any kind mean tracking is working.
+            title={
+              stats.clickFetches === 0
+                ? 'No link fetch has been recorded on this batch — nothing, person or scanner, has followed a link yet.'
+                : `${plural(stats.clicked, 'person', 'people')} clicked · ${plural(
+                    stats.clickFetches,
+                    'link fetch',
+                    'link fetches',
+                  )} recorded${
+                    stats.clicked === 0 ? ', all judged automatic' : ''
+                  }`
+            }
           />
         </div>
       </div>
