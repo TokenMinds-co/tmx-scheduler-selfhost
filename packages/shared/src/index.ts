@@ -344,6 +344,18 @@ export interface BatchStats {
   clicked: number;
   /** Recipients whose every click was judged a scanner's. */
   scannerClicks: number;
+  /**
+   * Every click hit recorded on the batch's mail, people and scanners alike.
+   * The plumbing check: above zero, the link is live and reachable, whatever
+   * the verdicts; zero on a sent batch means nothing has touched it.
+   */
+  clickFetches: number;
+  /**
+   * Messages carrying no link that tracking can follow, judged against the
+   * mailboxes' signatures as configured now. A batch reading 0% clicked with
+   * this above zero is not being ignored; it is unclickable.
+   */
+  untracked: number;
   /** Shares of `sent`, 0–1. Zero until something has been sent. */
   openRate: number;
   clickRate: number;
@@ -411,6 +423,14 @@ export interface ImportResult {
   /** Rows whose recipient is on the suppression list. */
   skippedSuppressed: number;
   errors: ImportRowError[];
+  /**
+   * Rows whose message can never register a click: no link in the body and
+   * no P.s. link on the sending mailbox's signature. Reported here, before
+   * the commit, because a batch that cannot be clicked is usually a mistake
+   * that is cheap to fix now and invisible later — it just reads as 0%.
+   * `mailboxes` names the senders whose signature has no P.s. link.
+   */
+  untracked: { rows: number; mailboxes: string[] };
   /** Set when the caller asked for a dry run; nothing was written. */
   dryRun: boolean;
 }

@@ -365,6 +365,25 @@ export default function ImportPage() {
                 />
               </div>
 
+              {/* Said here, while the sheet is still open, because after the
+                  send it only ever shows as 0% clicked. */}
+              {result.untracked.rows > 0 && (
+                <Alert tone="warning">
+                  <span className="font-medium">
+                    {result.untracked.rows === result.inserted
+                      ? 'None of these messages'
+                      : `${result.untracked.rows.toLocaleString()} of these messages`}
+                  </span>{' '}
+                  carry a link that can be tracked, so clicks will never be
+                  recorded for them. The message has no URL, and{' '}
+                  {result.untracked.mailboxes.length === 1
+                    ? `the mailbox ${result.untracked.mailboxes[0]} has`
+                    : `the mailboxes ${result.untracked.mailboxes.join(', ')} have`}{' '}
+                  no P.S. link in the signature. Add one, or a link to the
+                  sheet, before queueing if this batch should report clicks.
+                </Alert>
+              )}
+
               {result.errors.length > 0 && (
                 <Card
                   title={`${plural(result.errors.length, 'row')} need attention`}

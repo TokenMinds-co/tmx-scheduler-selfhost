@@ -339,7 +339,7 @@ export function Alert({
   children,
   onDismiss,
 }: {
-  tone?: 'error' | 'success' | 'info';
+  tone?: 'error' | 'success' | 'info' | 'warning';
   children: ReactNode;
   /** When given, the alert can be closed — a notice should not outlive its news. */
   onDismiss?: () => void;
@@ -348,6 +348,7 @@ export function Alert({
     error: 'bg-failed-soft text-failed border-failed/30',
     success: 'bg-sent-soft text-sent border-sent/30',
     info: 'bg-accent-soft text-accent border-accent/30',
+    warning: 'bg-pending-soft text-pending border-pending/30',
   };
   return (
     <div

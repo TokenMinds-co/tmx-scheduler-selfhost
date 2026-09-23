@@ -4,11 +4,10 @@ import { AppConfig, CONFIG } from '../config/configuration';
 import { CryptoService } from '../common/crypto.service';
 import { escapeHtml, textToHtml } from '../common/html';
 import {
-  decodeSignatureState,
   fillSignature,
-  normaliseSignatureUrl,
 } from '@ims/shared';
 import { rewriteLinks } from './link-rewrite';
+import { signatureCallToAction } from './trackable';
 import { TrackingService } from '../tracking/tracking.service';
 import type { Account, Signature } from '@prisma/client';
 
@@ -128,9 +127,8 @@ export class MessageBuilder {
    * and is left entirely alone.
    */
   private trackCallToAction(html: string, emailId: string): string {
-    const ctaUrl = decodeSignatureState(html)?.fields.ctaUrl ?? '';
-    const destination = normaliseSignatureUrl(ctaUrl);
-    if (!/^https?:\/\//i.test(destination)) return html;
+    const destination = signatureCallToAction(html);
+    if (!destination) return html;
     return rewriteLinks(html, (url) =>
       url === destination ? this.tracking.clickUrl(emailId, url) : null,
     );
