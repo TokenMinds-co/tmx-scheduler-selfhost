@@ -793,7 +793,7 @@ function QueueView() {
                     </div>
                   </td>
 
-                  {/* Every mailbox here is anchor@<something>, so the domain is
+                  {/* Every mailbox here is <name>@<domain>, so the domain is
                       the part worth reading. Below it, where the message came
                       from: its batch, and the group the sheet gave it. */}
                   <td className="text-xs">

@@ -11,8 +11,8 @@ function builtSignature(ctaUrl: string): string {
 
 describe('signatureCallToAction', () => {
   it('reads the P.s. destination the builder recorded', () => {
-    expect(signatureCallToAction(builtSignature('tokenminds.co/visibility'))).toBe(
-      'https://tokenminds.co/visibility',
+    expect(signatureCallToAction(builtSignature('example.com/visibility'))).toBe(
+      'https://example.com/visibility',
     );
   });
 

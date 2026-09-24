@@ -196,7 +196,7 @@ function trimTrailingPunctuation(url: string): string {
  * Best-effort plain-text fallback for a signature stored only as HTML.
  *
  * Line breaks are turned into newlines *before* the tags are stripped —
- * stripping first collapses "Kevin<br>TokenMinds" into "KevinTokenMinds",
+ * stripping first collapses "Ada<br>Example Ltd" into "AdaExample Ltd",
  * which is what every plain-text reader would then see as the sign-off.
  */
 export function htmlToText(html: string): string {

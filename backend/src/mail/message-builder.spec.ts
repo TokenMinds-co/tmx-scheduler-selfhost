@@ -9,8 +9,8 @@ import type { TrackingService } from '../tracking/tracking.service';
 import type { AppConfig } from '../config/configuration';
 
 const config = {
-  publicApiUrl: 'https://api.tmx.center',
-  trackingBaseUrl: 'https://api.tmx.center',
+  publicApiUrl: 'https://api.example.com',
+  trackingBaseUrl: 'https://api.example.com',
 } as AppConfig;
 
 const crypto = {
@@ -19,13 +19,13 @@ const crypto = {
 
 const tracking = {
   clickUrl: (emailId: string, destination: string) =>
-    `https://api.tmx.center/t/c?m=${emailId}&u=${encodeURIComponent(destination)}`,
-  openUrl: (emailId: string) => `https://api.tmx.center/t/o?m=${emailId}`,
+    `https://api.example.com/t/c?m=${emailId}&u=${encodeURIComponent(destination)}`,
+  openUrl: (emailId: string) => `https://api.example.com/t/o?m=${emailId}`,
 } as unknown as TrackingService;
 
 const account = {
-  email: 'outreach@email.tmx.center',
-  displayName: 'Kevin',
+  email: 'outreach@mail.example.com',
+  displayName: 'Ada',
   signatureId: null,
   signature: null,
 } as SendingAccount;
@@ -118,7 +118,7 @@ describe('signature', () => {
   };
   const library = {
     id: 'sig-1',
-    name: 'Anchor',
+    name: 'Ada',
     html: '<p>Email <a href="mailto:{{senderEmail}}">{{senderEmail}}</a></p>',
     text: 'Email: {{senderEmail}}',
     createdAt: new Date(),
@@ -132,9 +132,9 @@ describe('signature', () => {
       input,
     );
     expect(message.html).toContain(
-      '<a href="mailto:outreach@email.tmx.center">outreach@email.tmx.center</a>',
+      '<a href="mailto:outreach@mail.example.com">outreach@mail.example.com</a>',
     );
-    expect(message.text).toContain('Email: outreach@email.tmx.center');
+    expect(message.text).toContain('Email: outreach@mail.example.com');
     expect(message.html).not.toContain('{{senderEmail}}');
   });
 
@@ -173,49 +173,49 @@ describe('click tracking', () => {
     // only ever a link because textToHtml made it one.
     const output = html({
       ...base,
-      bodyText: 'Book a call: https://tokenminds.co/demo.',
+      bodyText: 'Book a call: https://example.com/demo.',
       bodyHtml: null,
     });
     expect(output).toContain(
-      `href="https://api.tmx.center/t/c?m=email-1&amp;u=${encodeURIComponent(
-        'https://tokenminds.co/demo',
+      `href="https://api.example.com/t/c?m=email-1&amp;u=${encodeURIComponent(
+        'https://example.com/demo',
       )}"`,
     );
-    expect(output).not.toContain('href="https://tokenminds.co/demo"');
+    expect(output).not.toContain('href="https://example.com/demo"');
   });
 
   it('leaves links untracked on a test send', () => {
     const output = html({
       ...base,
       emailId: null,
-      bodyText: 'https://tokenminds.co',
+      bodyText: 'https://example.com',
       bodyHtml: null,
     });
-    expect(output).toContain('href="https://tokenminds.co"');
+    expect(output).toContain('href="https://example.com"');
   });
 });
 
 describe('signature P.s. link', () => {
   const fields = {
     ...EMPTY_SIGNATURE_FIELDS,
-    fullName: 'Anchor Chan',
-    websiteUrl: 'https://www.visibility.tokenminds.co/',
+    fullName: 'Ada Lovelace',
+    websiteUrl: 'https://www.visibility.example.com/',
     email: '{{senderEmail}}',
     ctaText: 'See the full video',
     // An ampersand, so the attribute's &amp; has to be decoded to match.
-    ctaUrl: 'https://www.youtube.com/watch?v=QDuVvj94P_A&t=5',
+    ctaUrl: 'https://videos.example.com/watch?v=abc123&t=5',
   };
   const sender: SendingAccount = {
     ...account,
     signatureId: 'sig-1',
     signature: {
       id: 'sig-1',
-      name: 'Anchor',
+      name: 'Ada',
       html: withSignatureState(renderSignatureHtml('minimal', fields), {
         templateId: 'minimal',
         fields,
       }),
-      text: 'Anchor Chan',
+      text: 'Ada Lovelace',
       createdAt: new Date(),
       updatedAt: new Date(),
     },
@@ -232,7 +232,7 @@ describe('signature P.s. link', () => {
 
   it('is tracked like a body link', () => {
     expect(tracked()).toContain(
-      `href="https://api.tmx.center/t/c?m=email-1&amp;u=${encodeURIComponent(
+      `href="https://api.example.com/t/c?m=email-1&amp;u=${encodeURIComponent(
         fields.ctaUrl,
       )}"`,
     );
@@ -240,14 +240,14 @@ describe('signature P.s. link', () => {
 
   it('leaves the rest of the signature untracked', () => {
     const output = tracked();
-    expect(output).toContain('href="https://www.visibility.tokenminds.co/"');
-    expect(output).toContain('href="mailto:outreach@email.tmx.center"');
+    expect(output).toContain('href="https://www.visibility.example.com/"');
+    expect(output).toContain('href="mailto:outreach@mail.example.com"');
   });
 
   it('is not tracked on a test send', () => {
     const output = builder.build(sender, input).html as string;
     expect(output).toContain(
-      'href="https://www.youtube.com/watch?v=QDuVvj94P_A&amp;t=5"',
+      'href="https://videos.example.com/watch?v=abc123&amp;t=5"',
     );
     expect(output).not.toContain('/t/c?');
   });

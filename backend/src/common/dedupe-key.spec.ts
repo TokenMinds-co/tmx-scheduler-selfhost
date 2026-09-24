@@ -1,15 +1,15 @@
 import { dedupeKey } from './crypto.service';
 
 const base = {
-  sendingEmail: 'outreach@email.tmx.center',
-  toEmail: 'kevin@tokenminds.co',
+  sendingEmail: 'outreach@mail.example.com',
+  toEmail: 'ada@example.com',
   subject: 'Quick question',
   group: 'pilot-2026',
-  bodyText: 'Hi Kevin, are you hiring?',
+  bodyText: 'Hi Ada, are you hiring?',
   bodyHtml: null,
-  firstName: 'Kevin',
+  firstName: 'Ada',
   lastName: 'T',
-  company: 'TokenMinds',
+  company: 'Example Ltd',
 };
 
 describe('dedupeKey', () => {
@@ -25,15 +25,15 @@ describe('dedupeKey', () => {
 
   describe('anything the recipient would see makes it a new message', () => {
     it.each([
-      ['body', { bodyText: 'Hi Kevin, are you still hiring?' }],
-      ['html body', { bodyHtml: '<p>Hi Kevin</p>' }],
-      ['first name', { firstName: 'Kev' }],
-      ['last name', { lastName: 'Tanuwijaya' }],
-      ['company', { company: 'TMX' }],
+      ['body', { bodyText: 'Hi Ada, are you still hiring?' }],
+      ['html body', { bodyHtml: '<p>Hi Ada</p>' }],
+      ['first name', { firstName: 'Adah' }],
+      ['last name', { lastName: 'Lovelace' }],
+      ['company', { company: 'Example' }],
       ['subject', { subject: 'A different question' }],
       ['group', { group: 'pilot-2026-b' }],
-      ['recipient', { toEmail: 'yama@tokenminds.co' }],
-      ['sending mailbox', { sendingEmail: 'other@email.tmx.center' }],
+      ['recipient', { toEmail: 'grace@example.com' }],
+      ['sending mailbox', { sendingEmail: 'other@mail.example.com' }],
     ])('%s', (_label, change) => {
       expect(dedupeKey({ ...base, ...change })).not.toBe(dedupeKey(base));
     });

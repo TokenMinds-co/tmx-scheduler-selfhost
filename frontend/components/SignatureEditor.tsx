@@ -90,7 +90,7 @@ export function SignatureEditor({ signature }: { signature?: SignatureDto }) {
               value={name}
               required
               maxLength={120}
-              placeholder="Anchor Chan — CEO"
+              placeholder="Ada Lovelace — CEO"
               onChange={(e) => setName(e.target.value)}
             />
           </Field>

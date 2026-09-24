@@ -118,16 +118,16 @@ describe('clickVerdicts', () => {
     // open — every older rule passes it. But its /24 has followed the links in
     // mail to five unrelated companies.
     const verdicts = await serviceOver(
-      [click('a', 600, { ip: '40.94.31.17' })],
-      { '40.94.31': 5 },
+      [click('a', 600, { ip: '203.0.113.17' })],
+      { '203.0.113': 5 },
     ).clickVerdicts([{ id: 'a', firstOpenAt: after(30) }]);
     expect(verdicts.get('a')).toBe('scanner');
   });
 
   it('leaves a person alone on a network that is only theirs', async () => {
     const verdicts = await serviceOver(
-      [click('a', 600, { ip: '73.12.8.200' })],
-      { '73.12.8': 1 },
+      [click('a', 600, { ip: '198.51.100.200' })],
+      { '198.51.100': 1 },
     ).clickVerdicts([{ id: 'a', firstOpenAt: after(30) }]);
     expect(verdicts.get('a')).toBe('human');
   });

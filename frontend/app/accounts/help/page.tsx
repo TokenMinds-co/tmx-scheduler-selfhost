@@ -895,7 +895,7 @@ export default function MailboxSetupPage() {
             >
               <Input
                 value={draft.displayName}
-                placeholder="Kevin at TokenMinds"
+                placeholder="Ada at Example Ltd"
                 onChange={(e) => set('displayName', e.target.value)}
               />
             </Field>

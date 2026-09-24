@@ -41,12 +41,12 @@ interface FieldMeta {
 }
 
 const FIELD_META: Record<keyof SignatureFields, FieldMeta> = {
-  fullName: { label: 'Full name', placeholder: 'Anchor Chan' },
+  fullName: { label: 'Full name', placeholder: 'Ada Lovelace' },
   jobTitle: { label: 'Job title', placeholder: 'Chief Executive Officer' },
-  company: { label: 'Company', placeholder: 'TMX' },
+  company: { label: 'Company', placeholder: 'Example Ltd' },
   photoUrl: {
     label: 'Photo URL',
-    placeholder: 'https://cdn.example.com/anchor.png',
+    placeholder: 'https://cdn.example.com/ada.png',
     hint: 'A square headshot, around 200px. Must be a public https link.',
   },
   logoUrl: {
@@ -54,16 +54,16 @@ const FIELD_META: Record<keyof SignatureFields, FieldMeta> = {
     placeholder: 'https://cdn.example.com/logo.png',
     hint: 'Public https link. Transparent PNG reads best on both themes.',
   },
-  websiteUrl: { label: 'Website', placeholder: 'visibility.tmx.center' },
+  websiteUrl: { label: 'Website', placeholder: 'www.example.com' },
   websiteLabel: {
     label: 'Website link text',
     placeholder: 'Leave blank to show the address',
   },
-  email: { label: 'Email', placeholder: 'anchor@mail.tmx.center' },
-  phone: { label: 'Phone', placeholder: '+65 6123 4567' },
+  email: { label: 'Email', placeholder: 'ada@example.com' },
+  phone: { label: 'Phone', placeholder: '+1 555 0100' },
   address: {
     label: 'Address',
-    placeholder: '139 Cecil Street #03-10, Singapore (069539)',
+    placeholder: '1 Example Street, Suite 100, Example City',
     kind: 'multiline',
   },
   ctaText: {
@@ -252,7 +252,7 @@ export function SignatureBuilder({
               rows={14}
               className="font-mono text-xs"
               value={value.html}
-              placeholder="<p><strong>Kevin</strong><br />TokenMinds</p>"
+              placeholder="<p><strong>Ada</strong><br />Example Ltd</p>"
               onChange={(e) =>
                 // Plain text is derived server-side from the HTML when it is
                 // left blank, which is the right answer for a pasted block.
