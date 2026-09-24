@@ -8,7 +8,7 @@
 # addresses themselves come from DATABASE_URL and REDIS_URL in .env, where they
 # name the other containers, e.g.
 #
-#   DATABASE_URL=postgresql://user:pass@local-postgres:5432/mail_scheduler?schema=public
+#   DATABASE_URL=postgresql://user:pass@postgres:5432/mail_scheduler?schema=public
 #   REDIS_URL=redis://redis:6379
 #
 # Both networks below are `external`, so Compose refuses to start if either is
