@@ -144,7 +144,7 @@ function esc(value: string): string {
 }
 
 /**
- * Operators type `tokenminds.co`, not `https://tokenminds.co`. Assume https for
+ * Operators type `example.com`, not `https://example.com`. Assume https for
  * a bare host and drop anything that is neither https nor a mail/phone link —
  * an `http://` logo turns the whole message into mixed content, and the server
  * sanitiser would strip a `javascript:` href anyway.
@@ -159,7 +159,7 @@ export function normaliseSignatureUrl(raw: string): string {
   return `https://${value.replace(/^\/+/, '')}`;
 }
 
-/** `https://visibility.tmx.center/` becomes `visibility.tmx.center`. */
+/** `https://www.example.com/` becomes `www.example.com`. */
 export function prettyUrl(raw: string): string {
   return raw
     .trim()
@@ -211,7 +211,7 @@ interface Resolved {
 
 function resolve(fields: SignatureFields): Resolved {
   const websiteHref = normaliseSignatureUrl(fields.websiteUrl);
-  // "Chief Executive Officer, TMX" on one line: a job title without the company
+  // "Chief Executive Officer, Example Ltd" on one line: a job title without the company
   // reads as unfinished, and a second line makes the block taller than the photo.
   const role = [fields.jobTitle.trim(), fields.company.trim()]
     .filter(Boolean)

@@ -2,8 +2,8 @@ import { textToHtml } from './html';
 
 describe('textToHtml', () => {
   it('turns blocks into paragraphs and newlines into breaks', () => {
-    expect(textToHtml('Hi Ada\nThanks\n\nKevin')).toBe(
-      '<p>Hi Ada<br />Thanks</p>\n<p>Kevin</p>',
+    expect(textToHtml('Hi Ada\nThanks\n\nGrace')).toBe(
+      '<p>Hi Ada<br />Thanks</p>\n<p>Grace</p>',
     );
   });
 
@@ -17,9 +17,9 @@ describe('textToHtml', () => {
     // A link the mail client invents on display never passes through link
     // rewriting, so a plain-text body would otherwise record no clicks at all.
     it('become anchors', () => {
-      expect(textToHtml('See https://tokenminds.co/pricing today')).toContain(
-        '<a href="https://tokenminds.co/pricing" target="_blank" rel="noopener noreferrer">' +
-          'https://tokenminds.co/pricing</a> today',
+      expect(textToHtml('See https://example.com/pricing today')).toContain(
+        '<a href="https://example.com/pricing" target="_blank" rel="noopener noreferrer">' +
+          'https://example.com/pricing</a> today',
       );
     });
 

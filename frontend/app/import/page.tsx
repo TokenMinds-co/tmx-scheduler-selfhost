@@ -38,9 +38,9 @@ function templateCsv(sender: string): string {
       Company: 'Analytical Engines',
       Schedule: 'Sep 10 2026 9:00 AM',
       Message:
-        'Hi {{firstName}}, I noticed {{company}} is hiring. Our case studies are at https://tokenminds.co/work',
+        'Hi {{firstName}}, I noticed {{company}} is hiring. Our case studies are at https://example.com/work',
       'Message HTML':
-        '<p>Hi {{firstName}}, I noticed {{company}} is hiring.</p><p>Our <a href="https://tokenminds.co/work">case studies</a> might be useful.</p>',
+        '<p>Hi {{firstName}}, I noticed {{company}} is hiring.</p><p>Our <a href="https://example.com/work">case studies</a> might be useful.</p>',
       Subject: 'Quick question for {{company}}',
       Group: 'pilot-2026',
     },

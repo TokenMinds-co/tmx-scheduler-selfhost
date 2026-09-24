@@ -20,18 +20,18 @@ import { sanitizeSignatureHtml, htmlToText } from './html';
  */
 
 const FILLED: SignatureFields = {
-  fullName: 'Anchor Chan',
+  fullName: 'Ada Lovelace',
   jobTitle: 'Chief Executive Officer',
-  company: 'TMX',
-  photoUrl: 'https://cdn.tmx.center/anchor.png',
-  logoUrl: 'https://cdn.tmx.center/tmx-logo.png',
-  websiteUrl: 'visibility.tmx.center',
+  company: 'Example Ltd',
+  photoUrl: 'https://cdn.example.com/ada.png',
+  logoUrl: 'https://cdn.example.com/logo.png',
+  websiteUrl: 'example.com',
   websiteLabel: '',
-  email: 'anchor@mail.tmx.center',
-  phone: '+65 6123 4567',
-  address: '139 Cecil Street #03-10 YSY Building, Singapore (069539)',
+  email: 'ada@example.com',
+  phone: '+1 555 0100',
+  address: '1 Example Street #01-01, Example City 000000',
   ctaText: 'See the full video of how it works',
-  ctaUrl: 'https://www.youtube.com/watch?v=QDuVvj94P_A',
+  ctaUrl: 'https://videos.example.com/intro',
   accentColor: '#1d4ed8',
 };
 
@@ -48,16 +48,16 @@ describe('sender placeholder', () => {
   });
 
   it('fills in as a working mailto link', () => {
-    const filled = fillSignature(html, 'anchor@inbox.tmx.center', 'html');
-    expect(filled).toContain('href="mailto:anchor@inbox.tmx.center"');
-    expect(filled).toContain('>anchor@inbox.tmx.center</a>');
+    const filled = fillSignature(html, 'ada@inbox.example.com', 'html');
+    expect(filled).toContain('href="mailto:ada@inbox.example.com"');
+    expect(filled).toContain('>ada@inbox.example.com</a>');
     expect(filled).not.toContain(SENDER_EMAIL_PLACEHOLDER);
   });
 
   it('fills in the text half too', () => {
     const text = renderSignatureText({ ...FILLED, email: SENDER_EMAIL_PLACEHOLDER });
-    expect(fillSignature(text, 'anchor@inbox.tmx.center', 'text')).toContain(
-      'Email: anchor@inbox.tmx.center',
+    expect(fillSignature(text, 'ada@inbox.example.com', 'text')).toContain(
+      'Email: ada@inbox.example.com',
     );
   });
 
@@ -90,11 +90,11 @@ describe('signature templates', () => {
 
       it('keeps the details a signature exists for', () => {
         const clean = sanitizeSignatureHtml(html);
-        expect(clean).toContain('Anchor Chan');
-        expect(clean).toContain('Chief Executive Officer, TMX');
-        expect(clean).toContain('mailto:anchor@mail.tmx.center');
-        expect(clean).toContain('https://visibility.tmx.center');
-        expect(clean).toContain('139 Cecil Street');
+        expect(clean).toContain('Ada Lovelace');
+        expect(clean).toContain('Chief Executive Officer, Example Ltd');
+        expect(clean).toContain('mailto:ada@example.com');
+        expect(clean).toContain('https://example.com');
+        expect(clean).toContain('1 Example Street');
       });
 
       it('keeps the layout table, and the rule where the layout has one', () => {
@@ -125,7 +125,7 @@ describe('signature templates', () => {
   it('drops an http image rather than downgrading the message', () => {
     const html = renderSignatureHtml('photo-card', {
       ...FILLED,
-      logoUrl: 'http://cdn.tmx.center/tmx-logo.png',
+      logoUrl: 'http://cdn.example.com/logo.png',
     });
     expect(html).not.toContain('http://');
   });
@@ -159,13 +159,13 @@ describe('signature plain text', () => {
   it('carries the same details as the HTML, one per line', () => {
     expect(renderSignatureText(FILLED)).toBe(
       [
-        'Anchor Chan',
-        'Chief Executive Officer, TMX',
-        'Web: visibility.tmx.center',
-        'Email: anchor@mail.tmx.center',
-        'Phone: +65 6123 4567',
-        '139 Cecil Street #03-10 YSY Building, Singapore (069539)',
-        'P.s. See the full video of how it works: https://www.youtube.com/watch?v=QDuVvj94P_A',
+        'Ada Lovelace',
+        'Chief Executive Officer, Example Ltd',
+        'Web: example.com',
+        'Email: ada@example.com',
+        'Phone: +1 555 0100',
+        '1 Example Street #01-01, Example City 000000',
+        'P.s. See the full video of how it works: https://videos.example.com/intro',
       ].join('\n'),
     );
   });
@@ -177,17 +177,17 @@ describe('signature plain text', () => {
     const derived = htmlToText(renderSignatureHtml('photo-card', FILLED));
     expect(derived).not.toContain('Email: ');
     expect(renderSignatureText(FILLED).split('\n')).toContain(
-      'Email: anchor@mail.tmx.center',
+      'Email: ada@example.com',
     );
   });
 
   it('leaves no blank lines where a field was skipped', () => {
     const text = renderSignatureText({
       ...EMPTY_SIGNATURE_FIELDS,
-      fullName: 'Kevin',
-      email: 'kevin@tokenminds.co',
+      fullName: 'Grace',
+      email: 'grace@example.com',
     });
-    expect(text).toBe('Kevin\nEmail: kevin@tokenminds.co');
+    expect(text).toBe('Grace\nEmail: grace@example.com');
   });
 });
 
@@ -202,17 +202,17 @@ describe('builder round-trip', () => {
   });
 
   it('reports hand-written HTML as not from a template', () => {
-    expect(decodeSignatureState('<p>Kevin<br />TokenMinds</p>')).toBeNull();
+    expect(decodeSignatureState('<p>Grace<br />Example Ltd</p>')).toBeNull();
   });
 
   it('fills in fields added after a signature was saved', () => {
     const legacy = withSignatureState('<div>x</div>', {
       templateId: 'minimal',
-      fields: { fullName: 'Kevin' },
+      fields: { fullName: 'Grace' },
     } as never);
     expect(decodeSignatureState(legacy)?.fields).toEqual({
       ...EMPTY_SIGNATURE_FIELDS,
-      fullName: 'Kevin',
+      fullName: 'Grace',
     });
   });
 
