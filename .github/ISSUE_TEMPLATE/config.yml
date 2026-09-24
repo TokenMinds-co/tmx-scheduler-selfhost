@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/TokenMinds-co/tmx-scheduler/security/advisories/new
+    about: Privately, please. Public issues for vulnerabilities put every self-hoster at risk.

@@ -1,0 +1,35 @@
+name: Feature request
+description: Something the tool should do that it does not.
+labels: ['enhancement']
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you are trying to do and where the tool gets in the way. A concrete situation beats a general wish.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: What you would like to happen instead. If you have a design in mind, sketch it.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other ways to solve it, including ones you rejected and why.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Backend (scheduling, sending, tracking, API)
+        - Frontend (admin UI)
+        - Documentation
+        - CI / deployment
+        - Not sure
+    validations:
+      required: true
