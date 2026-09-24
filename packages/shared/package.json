@@ -1,14 +1,18 @@
 {
-  "name": "@ims/shared",
+  "name": "@tmx-scheduler/shared",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch --preserveWatchOutput",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint ."
   },
   "devDependencies": {
     "typescript": "^5.9.2"

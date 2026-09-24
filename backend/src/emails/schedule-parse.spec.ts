@@ -65,36 +65,33 @@ describe('parseSchedule', () => {
     expectUtc('Sep 10, 2026   12:03 AM  SGT', '2026-09-09T16:03:00.000Z');
   });
 
-  describe(
-    'a bare local time uses the zone chosen on the import screen',
-    () => {
-      it('parses it in the supplied fallback zone', () => {
-        const result = parseSchedule('Sep 10 2026 12:00 PM', 'Asia/Singapore');
-        expect(result.ok).toBe(true);
-        if (!result.ok) return;
-        // Noon in Singapore is 04:00 UTC.
-        expect(result.utc.toISOString()).toBe('2026-09-10T04:00:00.000Z');
-      });
+  describe('a bare local time uses the zone chosen on the import screen', () => {
+    it('parses it in the supplied fallback zone', () => {
+      const result = parseSchedule('Sep 10 2026 12:00 PM', 'Asia/Singapore');
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      // Noon in Singapore is 04:00 UTC.
+      expect(result.utc.toISOString()).toBe('2026-09-10T04:00:00.000Z');
+    });
 
-      it('lets the cell own zone win over the fallback', () => {
-        const result = parseSchedule(
-          'Sep 10 2026 12:00 PM UTC',
-          'Asia/Singapore',
-        );
-        expect(result.ok).toBe(true);
-        if (!result.ok) return;
-        expect(result.utc.toISOString()).toBe('2026-09-10T12:00:00.000Z');
-      });
+    it('lets the cell own zone win over the fallback', () => {
+      const result = parseSchedule(
+        'Sep 10 2026 12:00 PM UTC',
+        'Asia/Singapore',
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.utc.toISOString()).toBe('2026-09-10T12:00:00.000Z');
+    });
 
-      it('still rejects a mistyped zone rather than falling back', () => {
-        const result = parseSchedule(
-          'Sep 10 2026 12:00 PM XYZ',
-          'Asia/Singapore',
-        );
-        expect(result.ok).toBe(false);
-      });
-    },
-  );
+    it('still rejects a mistyped zone rather than falling back', () => {
+      const result = parseSchedule(
+        'Sep 10 2026 12:00 PM XYZ',
+        'Asia/Singapore',
+      );
+      expect(result.ok).toBe(false);
+    });
+  });
 });
 
 describe('a dot between hours and minutes', () => {

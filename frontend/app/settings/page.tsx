@@ -2,7 +2,12 @@
 
 import { useState } from 'react';
 import useSWR from 'swr';
-import type { AuditEntryDto, Paginated, SessionUserDto, UserRole } from '@ims/shared';
+import type {
+  AuditEntryDto,
+  Paginated,
+  SessionUserDto,
+  UserRole,
+} from '@tmx-scheduler/shared';
 import { Shell } from '@/components/Shell';
 import { ICONS, Icon } from '@/components/icons';
 import { api, fetcher } from '@/lib/api';
@@ -52,7 +57,10 @@ export default function SettingsPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
 
-  const users = useSWR<SessionUserDto[]>(isAdmin ? '/auth/users' : null, fetcher);
+  const users = useSWR<SessionUserDto[]>(
+    isAdmin ? '/auth/users' : null,
+    fetcher,
+  );
   // /auth/users returns every operator at once, so this table pages here.
   const userRows = usePagedRows(users.data);
   const [auditPage, setAuditPage] = useState(1);
@@ -267,7 +275,10 @@ export default function SettingsPage() {
                       {entry.action}
                     </code>
                   </td>
-                  <td className="max-w-[14rem] truncate" title={entry.target ?? ''}>
+                  <td
+                    className="max-w-[14rem] truncate"
+                    title={entry.target ?? ''}
+                  >
                     {entry.target ?? '—'}
                   </td>
                   <td className="text-xs">

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { parse } from 'csv-parse/sync';
-import { BatchRef, ImportResult, ImportRowError } from '@ims/shared';
+import { BatchRef, ImportResult, ImportRowError } from '@tmx-scheduler/shared';
 import { ApiException } from '../common/errors';
 import { dedupeKey } from '../common/crypto.service';
 import { sanitizeMessageHtml } from '../common/html';
@@ -117,7 +117,10 @@ export class ImportService {
 
     const errors: ImportRowError[] = [];
     const candidates: Array<{ row: number; doc: Record<string, unknown> }> = [];
-    const accountCache = new Map<string, Awaited<ReturnType<AccountsService["findByEmail"]>>>();
+    const accountCache = new Map<
+      string,
+      Awaited<ReturnType<AccountsService['findByEmail']>>
+    >();
 
     // Look the whole file's recipients up once instead of per row.
     const suppressed = await this.suppression.filterSuppressed(
@@ -449,7 +452,13 @@ export class ImportService {
       throw ApiException.badRequest('That file has no data rows.');
     }
 
-    const missing = ['sendingEmail', 'toEmail', 'schedule', 'subject', 'message']
+    const missing = [
+      'sendingEmail',
+      'toEmail',
+      'schedule',
+      'subject',
+      'message',
+    ]
       .filter((column) => !(column in records[0]))
       .map((column) => COLUMN_LABELS[column]);
     if (missing.length) {
@@ -480,4 +489,3 @@ const COLUMN_LABELS: Record<string, string> = {
   subject: 'Subject',
   message: 'Message',
 };
-

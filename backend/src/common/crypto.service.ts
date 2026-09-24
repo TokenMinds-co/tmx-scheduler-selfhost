@@ -78,11 +78,13 @@ export class CryptoService {
    * an unsubscribe or a session.
    */
   signTracking(kind: string, emailId: string, url = ''): string {
-    return createHmac('sha256', this.config.trackingSecret)
-      // Length-prefixed so ("click", "ab", "c") and ("click", "a", "bc")
-      // cannot collide into the same signature.
-      .update(`${kind}:${emailId.length}:${emailId}:${url}`)
-      .digest('base64url');
+    return (
+      createHmac('sha256', this.config.trackingSecret)
+        // Length-prefixed so ("click", "ab", "c") and ("click", "a", "bc")
+        // cannot collide into the same signature.
+        .update(`${kind}:${emailId.length}:${emailId}:${url}`)
+        .digest('base64url')
+    );
   }
 
   verifyTracking(

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import useSWR from 'swr';
-import { fillSignature, type SignatureDto } from '@ims/shared';
+import { fillSignature, type SignatureDto } from '@tmx-scheduler/shared';
 import { Shell } from '@/components/Shell';
 import { ICONS, Icon } from '@/components/icons';
 import { fetcher } from '@/lib/api';
@@ -40,7 +40,9 @@ function SignatureCard({
         <div className="flex min-w-0 items-center gap-2">
           <h2 className="truncate text-sm font-semibold">{signature.name}</h2>
           <Badge tone={count ? 'good' : 'neutral'}>
-            {count ? `${count} ${count === 1 ? 'mailbox' : 'mailboxes'}` : 'unused'}
+            {count
+              ? `${count} ${count === 1 ? 'mailbox' : 'mailboxes'}`
+              : 'unused'}
           </Badge>
         </div>
       }
@@ -92,9 +94,7 @@ export default function SignaturesPage() {
         actions={create}
       />
 
-      {signatures.error && (
-        <Alert>{(signatures.error as Error).message}</Alert>
-      )}
+      {signatures.error && <Alert>{(signatures.error as Error).message}</Alert>}
 
       {!signatures.data && !signatures.error && (
         <div className="grid gap-4 lg:grid-cols-2" aria-hidden>

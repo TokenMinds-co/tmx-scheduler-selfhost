@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, type ReactNode } from 'react';
 import useSWR from 'swr';
-import type { AccountDto, AuthType } from '@ims/shared';
+import type { AccountDto, AuthType } from '@tmx-scheduler/shared';
 import { Shell } from '@/components/Shell';
 import { ICONS, Icon } from '@/components/icons';
 import { api, fetcher } from '@/lib/api';
@@ -327,9 +327,7 @@ export default function AccountsPage() {
           ))}
         </div>
       )}
-      {accounts.error && (
-        <Alert>{(accounts.error as Error).message}</Alert>
-      )}
+      {accounts.error && <Alert>{(accounts.error as Error).message}</Alert>}
 
       <div className="grid gap-4 lg:grid-cols-2">
         {accounts.data?.map((account) => (

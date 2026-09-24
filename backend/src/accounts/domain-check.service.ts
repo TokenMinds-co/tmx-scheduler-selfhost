@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Resolver } from 'node:dns/promises';
-import type { DetectionConfidence, DomainCheck } from '@ims/shared';
+import type { DetectionConfidence, DomainCheck } from '@tmx-scheduler/shared';
 
 /**
  * Which provider runs a domain's mail, read from that domain's public DNS.
@@ -77,7 +77,9 @@ export class DomainCheckService {
     const valid =
       domain.length > 0 &&
       domain.length <= 253 &&
-      /^(?!-)[a-z0-9-]{1,63}(?<!-)(\.(?!-)[a-z0-9-]{1,63}(?<!-))+$/.test(domain);
+      /^(?!-)[a-z0-9-]{1,63}(?<!-)(\.(?!-)[a-z0-9-]{1,63}(?<!-))+$/.test(
+        domain,
+      );
 
     if (!valid) {
       throw new BadRequestException({

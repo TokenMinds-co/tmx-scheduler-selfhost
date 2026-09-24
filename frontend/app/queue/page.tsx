@@ -12,8 +12,8 @@ import type {
   EmailStatus,
   Paginated,
   QueueStats,
-} from '@ims/shared';
-import { EMAIL_STATUSES } from '@ims/shared';
+} from '@tmx-scheduler/shared';
+import { EMAIL_STATUSES } from '@tmx-scheduler/shared';
 import { Shell } from '@/components/Shell';
 import { ICONS, Icon } from '@/components/icons';
 import { api, fetcher } from '@/lib/api';
@@ -196,7 +196,10 @@ function ActivityLog({ email }: { email: EmailDto }) {
             </span>
           </div>
           <div className="mt-1 text-muted">{event.reason}</div>
-          <div className="mt-1 truncate text-muted" title={event.userAgent ?? ''}>
+          <div
+            className="mt-1 truncate text-muted"
+            title={event.userAgent ?? ''}
+          >
             {event.userAgent ?? 'no user agent'}
           </div>
           <div className="truncate text-muted">
@@ -230,7 +233,11 @@ function MailboxSummary({ rows }: { rows: AccountStats[] | undefined }) {
     <div className="flex flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 text-sm">
       <div className="flex items-center gap-3">
         <div className="w-28">
-          <Meter value={sent} max={capacity} tone={sent >= capacity ? 'full' : 'accent'} />
+          <Meter
+            value={sent}
+            max={capacity}
+            tone={sent >= capacity ? 'full' : 'accent'}
+          />
         </div>
         <span className="tabular-nums">
           {sent.toLocaleString()} / {capacity.toLocaleString()}
@@ -244,9 +251,7 @@ function MailboxSummary({ rows }: { rows: AccountStats[] | undefined }) {
       </span>
 
       {pending > 0 && (
-        <span className="text-muted">
-          {plural(pending, 'message')} waiting
-        </span>
+        <span className="text-muted">{plural(pending, 'message')} waiting</span>
       )}
       {failed > 0 && (
         <span className="font-medium text-failed">
@@ -483,7 +488,11 @@ function QueueView() {
 
       {/* Counters */}
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <Stat label="Due now" value={stats.data?.dueNow ?? '—'} tone="neutral" />
+        <Stat
+          label="Due now"
+          value={stats.data?.dueNow ?? '—'}
+          tone="neutral"
+        />
         <Stat
           label="Next 24h"
           value={stats.data?.next24h ?? '—'}
@@ -497,7 +506,9 @@ function QueueView() {
           value={stats.data?.sentToday ?? '—'}
           tone="sent"
           hint={
-            stats.data ? `${stats.data.byStatus.sent.toLocaleString()} all time` : undefined
+            stats.data
+              ? `${stats.data.byStatus.sent.toLocaleString()} all time`
+              : undefined
           }
         />
         {EMAIL_STATUSES.filter((s) => s !== 'sending' && s !== 'sent').map(
@@ -626,19 +637,19 @@ function QueueView() {
       <Card className="mb-4">
         <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="lg:col-span-2">
-          <Field label="Search recipient, company or subject">
-            <div className="relative">
-              <Icon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted">
-                {ICONS.search}
-              </Icon>
-              <Input
-                value={filters.search}
-                placeholder="ada@example.com"
-                className="pl-8"
-                onChange={(e) => setFilter('search', e.target.value)}
-              />
-            </div>
-          </Field>
+            <Field label="Search recipient, company or subject">
+              <div className="relative">
+                <Icon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted">
+                  {ICONS.search}
+                </Icon>
+                <Input
+                  value={filters.search}
+                  placeholder="ada@example.com"
+                  className="pl-8"
+                  onChange={(e) => setFilter('search', e.target.value)}
+                />
+              </div>
+            </Field>
           </div>
           <Field label="Mailbox">
             <Select
@@ -793,7 +804,7 @@ function QueueView() {
                     </div>
                   </td>
 
-                  {/* Every mailbox here is anchor@<something>, so the domain is
+                  {/* Every mailbox here is <name>@<domain>, so the domain is
                       the part worth reading. Below it, where the message came
                       from: its batch, and the group the sheet gave it. */}
                   <td className="text-xs">
@@ -856,7 +867,8 @@ function QueueView() {
                       empty cell reads as a button that failed to draw. */}
                   <td className="w-24 whitespace-nowrap text-right">
                     <div className="flex items-center justify-end gap-0.5">
-                      {(email.status === 'sent' || email.status === 'sending') && (
+                      {(email.status === 'sent' ||
+                        email.status === 'sending') && (
                         <span className="text-muted">—</span>
                       )}
                       {email.status === 'pending' && (
@@ -925,8 +937,8 @@ function QueueView() {
           inspecting && (
             <>
               Every hit on the message to{' '}
-              <span className="font-medium text-ink">{inspecting.toEmail}</span>,
-              and whether it was counted.
+              <span className="font-medium text-ink">{inspecting.toEmail}</span>
+              , and whether it was counted.
             </>
           )
         }

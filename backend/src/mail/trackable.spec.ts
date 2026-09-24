@@ -1,4 +1,7 @@
-import { EMPTY_SIGNATURE_FIELDS, withSignatureState } from '@ims/shared';
+import {
+  EMPTY_SIGNATURE_FIELDS,
+  withSignatureState,
+} from '@tmx-scheduler/shared';
 import { hasTrackableLink, signatureCallToAction } from './trackable';
 
 /** A builder signature whose P.s. points somewhere, as the library stores it. */
@@ -11,9 +14,9 @@ function builtSignature(ctaUrl: string): string {
 
 describe('signatureCallToAction', () => {
   it('reads the P.s. destination the builder recorded', () => {
-    expect(signatureCallToAction(builtSignature('tokenminds.co/visibility'))).toBe(
-      'https://tokenminds.co/visibility',
-    );
+    expect(
+      signatureCallToAction(builtSignature('example.com/visibility')),
+    ).toBe('https://example.com/visibility');
   });
 
   it('is null for a signature whose P.s. is empty', () => {
@@ -33,7 +36,10 @@ describe('signatureCallToAction', () => {
 });
 
 describe('hasTrackableLink', () => {
-  const plain = { bodyText: 'Hello Ada, are you free this week?', bodyHtml: null };
+  const plain = {
+    bodyText: 'Hello Ada, are you free this week?',
+    bodyHtml: null,
+  };
 
   it('is false for a plain message from a mailbox with no P.s.', () => {
     expect(hasTrackableLink({ ...plain, signatureHtml: null })).toBe(false);

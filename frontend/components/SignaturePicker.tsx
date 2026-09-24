@@ -6,7 +6,7 @@ import {
   fillSignature,
   type AccountDto,
   type SignatureDto,
-} from '@ims/shared';
+} from '@tmx-scheduler/shared';
 import { fetcher } from '@/lib/api';
 import { Alert, Field, Select } from './ui';
 

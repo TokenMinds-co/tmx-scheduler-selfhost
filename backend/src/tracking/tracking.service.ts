@@ -10,7 +10,7 @@ import type {
   EmailEventDto,
   TrackingBreakdown,
   TrackingStats,
-} from '@ims/shared';
+} from '@tmx-scheduler/shared';
 
 /** A hit, as observed at the endpoint. */
 export interface TrackingHit {
@@ -91,7 +91,11 @@ export class TrackingService {
    * URL: forwarding an unverified destination is precisely the open redirect
    * this design exists to avoid.
    */
-  resolveClick(emailId: string, encoded: string, signature: string): string | null {
+  resolveClick(
+    emailId: string,
+    encoded: string,
+    signature: string,
+  ): string | null {
     if (!emailId || !encoded || !signature) return null;
 
     let destination: string;
@@ -133,7 +137,12 @@ export class TrackingService {
     try {
       const email = await this.prisma.queuedEmail.findUnique({
         where: { id: hit.emailId },
-        select: { id: true, sentAt: true, firstOpenAt: true, firstClickAt: true },
+        select: {
+          id: true,
+          sentAt: true,
+          firstOpenAt: true,
+          firstClickAt: true,
+        },
       });
       if (!email) return;
 
@@ -231,9 +240,14 @@ export class TrackingService {
     if (!emails.length) return verdicts;
 
     const rules = rulesFromEnv();
-    const openedAt = new Map(emails.map((email) => [email.id, email.firstOpenAt]));
+    const openedAt = new Map(
+      emails.map((email) => [email.id, email.firstOpenAt]),
+    );
     const events = await this.prisma.emailEvent.findMany({
-      where: { emailId: { in: emails.map((email) => email.id) }, kind: 'click' },
+      where: {
+        emailId: { in: emails.map((email) => email.id) },
+        kind: 'click',
+      },
       select: {
         emailId: true,
         delaySeconds: true,
@@ -257,7 +271,8 @@ export class TrackingService {
         rules,
       );
       if (verdict === 'counted') verdicts.set(event.emailId, 'human');
-      else if (!verdicts.has(event.emailId)) verdicts.set(event.emailId, 'scanner');
+      else if (!verdicts.has(event.emailId))
+        verdicts.set(event.emailId, 'scanner');
     }
     return verdicts;
   }
@@ -291,7 +306,8 @@ export class TrackingService {
         {
           ...event,
           openedBefore: isClick
-            ? email.firstOpenAt !== null && email.firstOpenAt <= event.occurredAt
+            ? email.firstOpenAt !== null &&
+              email.firstOpenAt <= event.occurredAt
             : undefined,
           networkReach: isClick ? reachOf(reach, event.ip) : undefined,
         },
@@ -360,7 +376,9 @@ export class TrackingService {
       select: { id: true, firstOpenAt: true },
     });
     const ids = emails.map((email) => email.id);
-    const openedAt = new Map(emails.map((email) => [email.id, email.firstOpenAt]));
+    const openedAt = new Map(
+      emails.map((email) => [email.id, email.firstOpenAt]),
+    );
     if (!ids.length) return empty(rules);
 
     const events = await this.prisma.emailEvent.findMany({
@@ -443,7 +461,9 @@ export class TrackingService {
     if (!ip) return null;
     // Loopback and private ranges never have a useful PTR, and the lookup is
     // pure latency during local testing.
-    if (/^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|::1|fe80:)/i.test(ip)) {
+    if (
+      /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|::1|fe80:)/i.test(ip)
+    ) {
       return null;
     }
     try {

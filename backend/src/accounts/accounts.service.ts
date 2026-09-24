@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Signature, Prisma, type Account } from '@prisma/client';
 import { DateTime } from 'luxon';
-import { AccountDto, PROVIDER_PRESETS } from '@ims/shared';
+import { AccountDto, PROVIDER_PRESETS } from '@tmx-scheduler/shared';
 import { ApiException } from '../common/errors';
 import { CryptoService } from '../common/crypto.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -297,7 +297,8 @@ export class AccountsService {
     // The claim failed; work out which of the two gates closed so the caller
     // can reschedule to a time that will actually succeed.
     const atLimit =
-      account.sentTodayDate === today && account.sentToday >= account.dailyLimit;
+      account.sentTodayDate === today &&
+      account.sentToday >= account.dailyLimit;
     if (atLimit) {
       return {
         ok: false,
@@ -481,8 +482,8 @@ export class AccountsService {
       hasPassword: Boolean(account.smtpPasswordEnc),
       hasOAuthCredentials: Boolean(
         account.oauthClientId &&
-          account.oauthClientSecretEnc &&
-          account.oauthRefreshTokenEnc,
+        account.oauthClientSecretEnc &&
+        account.oauthRefreshTokenEnc,
       ),
       signatureId: account.signatureId,
       signatureName: account.signature?.name ?? null,

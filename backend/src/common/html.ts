@@ -31,8 +31,27 @@ const LENGTH = [/^\d+(\.\d+)?(px|pt|em|%)?$/, /^auto$/];
 export function sanitizeSignatureHtml(html: string): string {
   return sanitizeHtml(html, {
     allowedTags: [
-      'a', 'b', 'br', 'div', 'em', 'font', 'i', 'img', 'li', 'ol', 'p',
-      'span', 'strong', 'table', 'tbody', 'td', 'th', 'thead', 'tr', 'u', 'ul',
+      'a',
+      'b',
+      'br',
+      'div',
+      'em',
+      'font',
+      'i',
+      'img',
+      'li',
+      'ol',
+      'p',
+      'span',
+      'strong',
+      'table',
+      'tbody',
+      'td',
+      'th',
+      'thead',
+      'tr',
+      'u',
+      'ul',
     ],
     allowedAttributes: {
       a: ['href', 'target', 'rel'],
@@ -40,10 +59,17 @@ export function sanitizeSignatureHtml(html: string): string {
       // `role="presentation"` keeps a layout table out of a screen reader's
       // table navigation; the rest is what Outlook reads instead of the styles.
       table: [
-        'role', 'width', 'cellpadding', 'cellspacing', 'border', 'bgcolor',
+        'role',
+        'width',
+        'cellpadding',
+        'cellspacing',
+        'border',
+        'bgcolor',
         // Where the template builder stores the fields it rendered from, so a
         // saved signature can be re-opened in the form instead of as raw HTML.
-        'data-ims-signature', 'data-ims-signature-fields',
+        // `ims` is the legacy internal name, baked into stored signatures.
+        'data-ims-signature',
+        'data-ims-signature-fields',
       ],
       div: ['data-ims-signature', 'data-ims-signature-fields'],
       td: ['width', 'height', 'valign', 'colspan', 'rowspan', 'bgcolor'],
@@ -195,7 +221,7 @@ function trimTrailingPunctuation(url: string): string {
  * Best-effort plain-text fallback for a signature stored only as HTML.
  *
  * Line breaks are turned into newlines *before* the tags are stripped —
- * stripping first collapses "Kevin<br>TokenMinds" into "KevinTokenMinds",
+ * stripping first collapses "Ada<br>Example Ltd" into "AdaExample Ltd",
  * which is what every plain-text reader would then see as the sign-off.
  */
 export function htmlToText(html: string): string {

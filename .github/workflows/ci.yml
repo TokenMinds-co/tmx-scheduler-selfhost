@@ -1,0 +1,162 @@
+name: CI
+
+# Every check that can fail a change. Runs on every push and pull request, in
+# this repository and in any fork, and needs no secrets.
+#
+# No path filter on purpose: these jobs are the required checks for merging,
+# and a filtered workflow that does not run at all leaves a docs-only pull
+# request stuck on "expected".
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Type check, lint, format, unit tests and a build of both apps, in the
+  # order that fails fastest.
+  check:
+    name: check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # No version here: the action reads `packageManager` from the root
+      # package.json, so CI, the Dockerfile (via corepack) and every developer
+      # run the same pnpm.
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      # The backend's postinstall runs `prisma generate`, so the client exists
+      # before the type check without a separate step.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Before anything else: both apps import @tmx-scheduler/shared through
+      # its dist/, which does not exist until this runs.
+      - name: Build shared contracts
+        run: pnpm --filter @tmx-scheduler/shared build
+
+      - name: Type check
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Format check
+        run: pnpm format:check
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Build backend
+        run: pnpm --filter backend build
+
+      - name: Build frontend
+        run: pnpm --filter frontend build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+          # Baked into the bundle at build time; any value proves the build.
+          NEXT_PUBLIC_API_URL: http://localhost:4000/api
+
+  # Apply every migration to an empty Postgres, then prove the result is the
+  # schema. This is what catches a schema edit committed without its
+  # migration, or a migration that drifted from the schema.
+  migrations:
+    name: migrations
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: mail_scheduler
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d mail_scheduler"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mail_scheduler?schema=public
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install backend dependencies
+        run: pnpm install --frozen-lockfile --filter backend...
+
+      - name: Apply every migration
+        run: pnpm --filter backend exec prisma migrate deploy
+
+      # Exit code 2 means the database and the schema differ.
+      - name: Schema and migrations must agree
+        run: >-
+          pnpm --filter backend exec prisma migrate diff
+          --from-url "$DATABASE_URL"
+          --to-schema-datamodel prisma/schema.prisma
+          --exit-code
+
+  # Whole-history secrets scan. The official container rather than the
+  # marketplace action, which wants a licence key for organisation repos.
+  gitleaks:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan
+        run: >-
+          docker run --rm -v "$GITHUB_WORKSPACE:/repo"
+          ghcr.io/gitleaks/gitleaks:latest
+          detect --source /repo --no-banner --redact -v
+
+  # The production image still builds. Nothing is pushed; deploy.yml does
+  # that for main.
+  docker:
+    name: docker
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/Dockerfile
+          push: false
+          cache-from: type=gha
+          # Only a push can write the cache; a fork's pull request cannot.
+          cache-to: ${{ github.event_name == 'push' && 'type=gha,mode=max' || '' }}

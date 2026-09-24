@@ -3,9 +3,7 @@ import type { SendMailOptions } from 'nodemailer';
 import { AppConfig, CONFIG } from '../config/configuration';
 import { CryptoService } from '../common/crypto.service';
 import { escapeHtml, textToHtml } from '../common/html';
-import {
-  fillSignature,
-} from '@ims/shared';
+import { fillSignature } from '@tmx-scheduler/shared';
 import { rewriteLinks } from './link-rewrite';
 import { signatureCallToAction } from './trackable';
 import { TrackingService } from '../tracking/tracking.service';
@@ -234,15 +232,12 @@ export class MessageBuilder {
       company: input.company ?? '',
       email: input.toEmail,
     };
-    return template.replace(
-      /\{\{\s*(\w+)\s*\}\}/g,
-      (match, key: string) => {
-        const value = values[key];
-        // An unknown placeholder is left untouched rather than blanked, so a
-        // typo is visible in a test send instead of producing "Hi ,".
-        if (value === undefined) return match;
-        return escape ? escapeHtml(value) : value;
-      },
-    );
+    return template.replace(/\{\{\s*(\w+)\s*\}\}/g, (match, key: string) => {
+      const value = values[key];
+      // An unknown placeholder is left untouched rather than blanked, so a
+      // typo is visible in a test send instead of producing "Hi ,".
+      if (value === undefined) return match;
+      return escape ? escapeHtml(value) : value;
+    });
   }
 }

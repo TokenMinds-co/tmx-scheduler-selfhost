@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import type { User } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
-import { SessionUserDto, UserRole } from '@ims/shared';
+import { SessionUserDto, UserRole } from '@tmx-scheduler/shared';
 import { ApiException } from '../common/errors';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';

@@ -60,11 +60,17 @@ describe('daily counter', () => {
     );
     // From 03:00 Singapore: 9 AM the same calendar day, not the day after.
     expect(
-      startOfNextDay('Asia/Singapore', new Date('2026-09-09T19:00:00Z')).toISOString(),
+      startOfNextDay(
+        'Asia/Singapore',
+        new Date('2026-09-09T19:00:00Z'),
+      ).toISOString(),
     ).toBe('2026-09-10T01:00:00.000Z');
     // Exactly at 9 AM the new day has begun, so the next boundary is tomorrow.
     expect(
-      startOfNextDay('Asia/Singapore', new Date('2026-09-10T01:00:00Z')).toISOString(),
+      startOfNextDay(
+        'Asia/Singapore',
+        new Date('2026-09-10T01:00:00Z'),
+      ).toISOString(),
     ).toBe('2026-09-11T01:00:00.000Z');
   });
 });

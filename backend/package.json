@@ -2,13 +2,14 @@
   "name": "backend",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "build": "prisma generate && nest build",
     "dev": "nest start --watch",
     "start": "nest start",
     "start:prod": "node dist/main.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "eslint \"src/**/*.ts\"",
+    "lint": "eslint .",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
     "seed": "ts-node -r tsconfig-paths/register src/scripts/seed.ts",
@@ -19,7 +20,7 @@
     "db:studio": "prisma studio"
   },
   "dependencies": {
-    "@ims/shared": "workspace:*",
+    "@tmx-scheduler/shared": "workspace:*",
     "@nestjs/bullmq": "^11.0.2",
     "@nestjs/common": "^11.1.6",
     "@nestjs/config": "^4.0.2",

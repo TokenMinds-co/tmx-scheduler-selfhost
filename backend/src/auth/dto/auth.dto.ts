@@ -6,7 +6,7 @@ import {
   IsString,
   MinLength,
 } from 'class-validator';
-import { UserRole } from '@ims/shared';
+import { UserRole } from '@tmx-scheduler/shared';
 
 export class LoginDto {
   @IsEmail()

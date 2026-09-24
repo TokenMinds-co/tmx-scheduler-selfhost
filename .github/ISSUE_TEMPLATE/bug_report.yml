@@ -1,0 +1,58 @@
+name: Bug report
+description: Something does not behave as documented.
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks. Two things decide whether a bug can be reproduced: the exact version and how it is deployed, so please fill those in. **Security problems go through [SECURITY.md](../blob/main/SECURITY.md), not here.**
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Add a mailbox with …
+        2. Import a sheet with a row scheduled for …
+        3. Watch the queue page …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The `version` field from `GET /health`, or the release tag.
+      placeholder: v0.1.0 or a1b2c3d
+    validations:
+      required: true
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: How it is deployed
+      options:
+        - Docker image (backend/docker-compose-production.yml or similar)
+        - From source with `pnpm dev`
+        - Something else (say what below)
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Backend log lines around the problem. Redact addresses and secrets.
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before opening
+      options:
+        - label: I searched existing issues.
+          required: true
+        - label: This is not a security vulnerability (those go through SECURITY.md).
+          required: true

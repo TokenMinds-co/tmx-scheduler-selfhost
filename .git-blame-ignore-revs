@@ -1,0 +1,5 @@
+# `git blame --ignore-revs-file .git-blame-ignore-revs`, or set
+# `git config blame.ignoreRevsFile .git-blame-ignore-revs` once.
+
+# style: format with prettier
+25fabe409f37dff2c12fcedc79e68c9c5e02f709

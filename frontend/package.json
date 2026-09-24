@@ -2,15 +2,16 @@
   "name": "frontend",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start -p 3000",
     "typecheck": "tsc --noEmit",
-    "lint": "next lint"
+    "lint": "eslint ."
   },
   "dependencies": {
-    "@ims/shared": "workspace:*",
+    "@tmx-scheduler/shared": "workspace:*",
     "luxon": "^3.7.1",
     "next": "^15.5.2",
     "react": "^19.1.1",

@@ -72,10 +72,9 @@ export function loadConfig(): AppConfig {
     jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '12h',
     unsubscribeSecret: required('UNSUBSCRIBE_SECRET'),
     trackingSecret: required('TRACKING_SECRET'),
-    publicApiUrl: (process.env.PUBLIC_API_URL ?? 'http://localhost:4000').replace(
-      /\/+$/,
-      '',
-    ),
+    publicApiUrl: (
+      process.env.PUBLIC_API_URL ?? 'http://localhost:4000'
+    ).replace(/\/+$/, ''),
     // Tracking links live on their own host in production so the sending
     // domain's reputation and the redirect endpoint can be managed apart.
     // Falls back to the API origin, which is what makes local Mailpit testing

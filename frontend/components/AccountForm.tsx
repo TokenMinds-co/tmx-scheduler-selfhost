@@ -3,8 +3,12 @@
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 import useSWR from 'swr';
-import type { AccountDto, AuthType, SignatureDto } from '@ims/shared';
-import { AUTH_TYPES, COMMON_TIMEZONES, PROVIDER_PRESETS } from '@ims/shared';
+import type { AccountDto, AuthType, SignatureDto } from '@tmx-scheduler/shared';
+import {
+  AUTH_TYPES,
+  COMMON_TIMEZONES,
+  PROVIDER_PRESETS,
+} from '@tmx-scheduler/shared';
 import { api, fetcher } from '@/lib/api';
 import { ICONS, Icon } from './icons';
 import {
@@ -134,9 +138,9 @@ export function AccountForm({ account }: { account?: AccountDto }) {
     );
     if (!invalid) return true;
 
-    const section = invalid.closest('[data-section]')?.getAttribute(
-      'data-section',
-    ) as SectionId | null;
+    const section = invalid
+      .closest('[data-section]')
+      ?.getAttribute('data-section') as SectionId | null;
     if (section && section !== open) setOpen(section);
 
     // The panel is still hidden in this tick; report once React has shown it.
@@ -181,14 +185,21 @@ export function AccountForm({ account }: { account?: AccountDto }) {
       'oauthTenantId',
     ] as const) {
       if (form[key]) payload[key] = form[key];
-      else if (!editing && key === 'smtpPassword' && form.authType === 'smtp_password') {
+      else if (
+        !editing &&
+        key === 'smtpPassword' &&
+        form.authType === 'smtp_password'
+      ) {
         payload[key] = '';
       }
     }
 
     try {
       if (editing) {
-        await api(`/accounts/${account!.id}`, { method: 'PATCH', body: payload });
+        await api(`/accounts/${account!.id}`, {
+          method: 'PATCH',
+          body: payload,
+        });
       } else {
         await api('/accounts', { method: 'POST', body: payload });
       }
@@ -252,7 +263,11 @@ export function AccountForm({ account }: { account?: AccountDto }) {
         <div className="grid gap-4 p-4 sm:grid-cols-2">
           <Field
             label="Email address"
-            hint={editing ? 'The address cannot be changed after creation.' : undefined}
+            hint={
+              editing
+                ? 'The address cannot be changed after creation.'
+                : undefined
+            }
           >
             <Input
               type="email"
@@ -324,10 +339,7 @@ export function AccountForm({ account }: { account?: AccountDto }) {
               onChange={(e) => set('smtpHost', e.target.value)}
             />
           </Field>
-          <Field
-            label="Port"
-            hint="587 for STARTTLS, 465 for implicit TLS."
-          >
+          <Field label="Port" hint="587 for STARTTLS, 465 for implicit TLS.">
             <Input
               type="number"
               value={form.smtpPort}
@@ -369,7 +381,9 @@ export function AccountForm({ account }: { account?: AccountDto }) {
               </Field>
               <Field
                 label="OAuth client secret"
-                hint={editing ? 'Leave blank to keep the stored secret.' : undefined}
+                hint={
+                  editing ? 'Leave blank to keep the stored secret.' : undefined
+                }
               >
                 <Input
                   type="password"
@@ -380,7 +394,9 @@ export function AccountForm({ account }: { account?: AccountDto }) {
               </Field>
               <Field
                 label="Refresh token"
-                hint={editing ? 'Leave blank to keep the stored token.' : undefined}
+                hint={
+                  editing ? 'Leave blank to keep the stored token.' : undefined
+                }
               >
                 <Input
                   type="password"
@@ -413,8 +429,8 @@ export function AccountForm({ account }: { account?: AccountDto }) {
           </div>
         </div>
         <p className="border-t border-border px-4 py-3 text-xs text-muted">
-          Saving tests the login before anything is stored. A mailbox that cannot
-          authenticate is never added to the queue.
+          Saving tests the login before anything is stored. A mailbox that
+          cannot authenticate is never added to the queue.
         </p>
       </AccordionSection>
 

@@ -75,9 +75,10 @@ Save that password now — it is only printed here. Change it after signing in.
 }
 
 console.log(`Next:
-  pnpm infra:up                    start Redis and Mailpit
-  pnpm --filter @ims/shared build  build the shared contracts
-  pnpm --filter backend db:migrate create the Postgres tables
-  pnpm seed                        create the first admin
-  pnpm dev                         API on :4000, UI on :3000
+  pnpm infra:up                              start Postgres, Redis and Mailpit
+  pnpm --filter @tmx-scheduler/shared build  build the shared contracts
+  pnpm --filter backend db:migrate           create the Postgres tables
+  pnpm dev                                   API on :4000, UI on :3000
+
+The first admin is created on boot from SEED_ADMIN_* when no user exists.
 `);

@@ -13,7 +13,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Values match the string unions in @ims/shared exactly, so a Prisma enum and
+// Values match the string unions in @tmx-scheduler/shared exactly, so a Prisma enum and
 // the shared type are interchangeable without casting on either side.
 enum EmailStatus {
   pending

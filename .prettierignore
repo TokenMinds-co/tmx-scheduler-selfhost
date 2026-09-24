@@ -1,0 +1,10 @@
+node_modules
+dist
+.next
+coverage
+pnpm-lock.yaml
+*.tsbuildinfo
+backend/prisma/migrations
+# Hand-formatted, and the Covenant is third-party text kept verbatim.
+CHANGELOG.md
+CODE_OF_CONDUCT.md

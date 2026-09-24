@@ -11,7 +11,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import { AUTH_TYPES, AuthType } from '@ims/shared';
+import { AUTH_TYPES, AuthType } from '@tmx-scheduler/shared';
 
 /**
  * Accepts an address or a bare domain; the service reduces one to the other

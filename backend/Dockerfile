@@ -38,10 +38,10 @@ RUN pnpm config set store-dir /tmp/.pnpm-store && \
 COPY packages/shared packages/shared
 COPY backend backend
 
-# @ims/shared has to be compiled before the backend — its imports resolve to
+# @tmx-scheduler/shared has to be compiled before the backend — its imports resolve to
 # dist/index.d.ts, which does not exist until then. The backend's own build
 # script runs `prisma generate` again before `nest build`.
-RUN pnpm --filter @ims/shared build && \
+RUN pnpm --filter @tmx-scheduler/shared build && \
     pnpm --filter backend build
 
 # ---------------------------------------------------------------------------

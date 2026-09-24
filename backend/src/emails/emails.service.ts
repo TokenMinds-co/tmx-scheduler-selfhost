@@ -7,7 +7,7 @@ import {
   EmailStatus,
   Paginated,
   QueueStats,
-} from '@ims/shared';
+} from '@tmx-scheduler/shared';
 import { AppConfig, CONFIG } from '../config/configuration';
 import { ApiException } from '../common/errors';
 import { sentTodayOf } from '../accounts/daily-counter';

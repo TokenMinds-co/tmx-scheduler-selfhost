@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { AuditEntryDto, Paginated } from '@ims/shared';
+import { AuditEntryDto, Paginated } from '@tmx-scheduler/shared';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -37,7 +37,10 @@ export class AuditService {
     }
   }
 
-  async list(page: number, pageSize: number): Promise<Paginated<AuditEntryDto>> {
+  async list(
+    page: number,
+    pageSize: number,
+  ): Promise<Paginated<AuditEntryDto>> {
     const [items, total] = await Promise.all([
       this.prisma.auditEntry.findMany({
         orderBy: { createdAt: 'desc' },

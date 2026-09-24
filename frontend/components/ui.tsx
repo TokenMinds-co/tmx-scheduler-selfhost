@@ -8,7 +8,7 @@ import type {
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
 } from 'react';
-import type { EmailStatus } from '@ims/shared';
+import type { EmailStatus } from '@tmx-scheduler/shared';
 
 export function cx(...parts: Array<string | false | undefined | null>): string {
   return parts.filter(Boolean).join(' ');
@@ -21,9 +21,11 @@ export function cx(...parts: Array<string | false | undefined | null>): string {
 type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
 
 const BUTTON_STYLES: Record<ButtonVariant, string> = {
-  primary: 'brand-gradient text-white shadow-sm shadow-accent/30 hover:opacity-90',
+  primary:
+    'brand-gradient text-white shadow-sm shadow-accent/30 hover:opacity-90',
   secondary: 'bg-surface border border-border hover:bg-accent-soft',
-  danger: 'bg-failed-soft text-failed border border-failed/30 hover:bg-failed/15',
+  danger:
+    'bg-failed-soft text-failed border border-failed/30 hover:bg-failed/15',
   ghost: 'hover:bg-accent-soft',
 };
 
@@ -199,7 +201,9 @@ export function Stat({
       <div className="text-xs font-medium uppercase tracking-wide text-muted">
         {label}
       </div>
-      <div className={cx('mt-1 text-2xl font-semibold tabular-nums', toneClass)}>
+      <div
+        className={cx('mt-1 text-2xl font-semibold tabular-nums', toneClass)}
+      >
         {value}
       </div>
       {hint && <div className="mt-0.5 text-xs text-muted">{hint}</div>}
@@ -286,7 +290,9 @@ export function Field({
     <label className={cx('block', className)}>
       <span className="mb-1 block text-xs font-medium text-muted">{label}</span>
       {children}
-      {hint && !error && <span className="mt-1 block text-xs text-muted">{hint}</span>}
+      {hint && !error && (
+        <span className="mt-1 block text-xs text-muted">{hint}</span>
+      )}
       {error && <span className="mt-1 block text-xs text-failed">{error}</span>}
     </label>
   );
@@ -302,7 +308,10 @@ export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
 
 export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return (
-    <textarea {...props} className={cx(CONTROL, 'font-mono', props.className)} />
+    <textarea
+      {...props}
+      className={cx(CONTROL, 'font-mono', props.className)}
+    />
   );
 }
 
@@ -508,7 +517,10 @@ export const ROWS_PER_PAGE = 10;
  * row at once. Server-paginated tables keep their own `page` state and pass
  * the server's `pageSize`/`total` to <Pagination> directly.
  */
-export function usePagedRows<T>(rows: T[] | undefined, pageSize = ROWS_PER_PAGE) {
+export function usePagedRows<T>(
+  rows: T[] | undefined,
+  pageSize = ROWS_PER_PAGE,
+) {
   const [page, setPage] = useState(1);
   const total = rows?.length ?? 0;
   const pages = Math.max(1, Math.ceil(total / pageSize));

@@ -1,7 +1,7 @@
 import { seedAdmin, type AdminSeedStore } from './seed-admin';
 
 const env = {
-  SEED_ADMIN_EMAIL: 'Admin@TokenMinds.co',
+  SEED_ADMIN_EMAIL: 'Admin@Example.com',
   SEED_ADMIN_PASSWORD: 'a-long-enough-password',
   SEED_ADMIN_NAME: 'Admin',
 };
@@ -34,11 +34,15 @@ describe('seedAdmin', () => {
       env,
     );
 
-    expect(result).toEqual({ status: 'created', email: 'admin@tokenminds.co' });
+    expect(result).toEqual({ status: 'created', email: 'admin@example.com' });
     expect(created).toHaveLength(1);
-    const data = created[0] as { email: string; role: string; passwordHash: string };
+    const data = created[0] as {
+      email: string;
+      role: string;
+      passwordHash: string;
+    };
     // Lower-cased on the way in, and never stored in the clear.
-    expect(data.email).toBe('admin@tokenminds.co');
+    expect(data.email).toBe('admin@example.com');
     expect(data.role).toBe('admin');
     expect(data.passwordHash).not.toContain('a-long-enough-password');
   });
@@ -113,7 +117,10 @@ describe('seedAdmin', () => {
           },
         },
       },
-      { SEED_ADMIN_EMAIL: env.SEED_ADMIN_EMAIL, SEED_ADMIN_PASSWORD: env.SEED_ADMIN_PASSWORD },
+      {
+        SEED_ADMIN_EMAIL: env.SEED_ADMIN_EMAIL,
+        SEED_ADMIN_PASSWORD: env.SEED_ADMIN_PASSWORD,
+      },
     );
     expect((created[0] as { name: string }).name).toBe('Admin');
   });

@@ -35,11 +35,13 @@ export function rewriteLinks(
  * verification on every link that takes more than one parameter.
  */
 function decodeAttribute(value: string): string {
-  return value
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    // Ampersand last: decoding it first would let `&amp;lt;` become `<`.
-    .replace(/&amp;/g, '&');
+  return (
+    value
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      // Ampersand last: decoding it first would let `&amp;lt;` become `<`.
+      .replace(/&amp;/g, '&')
+  );
 }

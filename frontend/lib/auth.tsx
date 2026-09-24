@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import type { SessionUserDto } from '@ims/shared';
+import type { SessionUserDto } from '@tmx-scheduler/shared';
 import { api, tokenStore } from './api';
 
 interface AuthState {

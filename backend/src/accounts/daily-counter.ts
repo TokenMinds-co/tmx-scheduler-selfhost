@@ -42,8 +42,9 @@ export function localDate(timezone: string, at: Date): string {
 export function startOfNextDay(timezone: string, from: Date): Date {
   const local = DateTime.fromJSDate(from).setZone(timezone);
   const todayReset = local.startOf('day').set({ hour: DAY_RESET_HOUR });
-  return (local < todayReset ? todayReset : todayReset.plus({ days: 1 }))
-    .toJSDate();
+  return (
+    local < todayReset ? todayReset : todayReset.plus({ days: 1 })
+  ).toJSDate();
 }
 
 /** The count that is true *now*, not the one last written. */

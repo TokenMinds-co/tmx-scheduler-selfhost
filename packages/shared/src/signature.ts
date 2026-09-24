@@ -57,10 +57,7 @@ export const EMPTY_SIGNATURE_FIELDS: SignatureFields = {
 };
 
 export type SignatureTemplateId =
-  | 'photo-card'
-  | 'logo-left'
-  | 'stacked'
-  | 'minimal';
+  'photo-card' | 'logo-left' | 'stacked' | 'minimal';
 
 export interface SignatureTemplate {
   id: SignatureTemplateId;
@@ -144,7 +141,7 @@ function esc(value: string): string {
 }
 
 /**
- * Operators type `tokenminds.co`, not `https://tokenminds.co`. Assume https for
+ * Operators type `example.com`, not `https://example.com`. Assume https for
  * a bare host and drop anything that is neither https nor a mail/phone link —
  * an `http://` logo turns the whole message into mixed content, and the server
  * sanitiser would strip a `javascript:` href anyway.
@@ -159,7 +156,7 @@ export function normaliseSignatureUrl(raw: string): string {
   return `https://${value.replace(/^\/+/, '')}`;
 }
 
-/** `https://visibility.tmx.center/` becomes `visibility.tmx.center`. */
+/** `https://www.example.com/` becomes `www.example.com`. */
 export function prettyUrl(raw: string): string {
   return raw
     .trim()
@@ -211,7 +208,7 @@ interface Resolved {
 
 function resolve(fields: SignatureFields): Resolved {
   const websiteHref = normaliseSignatureUrl(fields.websiteUrl);
-  // "Chief Executive Officer, TMX" on one line: a job title without the company
+  // "Chief Executive Officer, Example Ltd" on one line: a job title without the company
   // reads as unfinished, and a second line makes the block taller than the photo.
   const role = [fields.jobTitle.trim(), fields.company.trim()]
     .filter(Boolean)
@@ -299,7 +296,9 @@ function ruleBlock(): string {
 function contactBlock(r: Resolved): string {
   const inline: string[] = [];
   if (r.website) {
-    inline.push(`<b>Web</b> ${link(r.website.href, r.website.label, r.accent)}`);
+    inline.push(
+      `<b>Web</b> ${link(r.website.href, r.website.label, r.accent)}`,
+    );
   }
   if (r.email) {
     inline.push(`<b>Email</b> ${link(`mailto:${r.email}`, r.email, r.accent)}`);
@@ -337,7 +336,12 @@ function ctaBlock(r: Resolved): string {
  * everything else reads the style, and `height:auto` is what stops a client
  * from stretching a logo to its intrinsic pixel height.
  */
-function image(url: string, alt: string, width: number, padding: string): string {
+function image(
+  url: string,
+  alt: string,
+  width: number,
+  padding: string,
+): string {
   if (!url) return '';
   return (
     `<img src="${esc(url)}" alt="${esc(alt)}" width="${width}" ` +
@@ -356,12 +360,7 @@ function table(body: string): string {
 }
 
 function detailsColumn(r: Resolved): string {
-  return [
-    nameBlock(r),
-    roleBlock(r),
-    ruleBlock(),
-    contactBlock(r),
-  ].join('');
+  return [nameBlock(r), roleBlock(r), ruleBlock(), contactBlock(r)].join('');
 }
 
 // ---------------------------------------------------------------------------
@@ -482,6 +481,9 @@ export function renderSignatureText(fields: SignatureFields): string {
  * Values are percent-encoded JSON: that alphabet contains no quote or angle
  * bracket, so the payload cannot close the tag it lives in, and it holds only
  * what the signature already displays.
+ *
+ * `ims` in both attribute names is the legacy internal name. They are part of
+ * every signature already stored, so they stay.
  */
 const STATE_ATTR = 'data-ims-signature-fields';
 

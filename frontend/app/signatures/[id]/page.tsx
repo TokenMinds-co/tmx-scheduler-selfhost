@@ -2,7 +2,7 @@
 
 import { use } from 'react';
 import useSWR from 'swr';
-import type { SignatureDto } from '@ims/shared';
+import type { SignatureDto } from '@tmx-scheduler/shared';
 import { Shell } from '@/components/Shell';
 import { SignatureEditor } from '@/components/SignatureEditor';
 import { Alert, PageHeader, Spinner } from '@/components/ui';

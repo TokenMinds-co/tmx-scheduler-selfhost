@@ -7,7 +7,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
-import { UserRole } from '@ims/shared';
+import { UserRole } from '@tmx-scheduler/shared';
 import { ApiException } from '../common/errors';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 
@@ -21,7 +21,7 @@ export const Roles = (...roles: UserRole[]) =>
 
 /**
  * Registered globally, so a new controller is authenticated unless it opts out
- * with `@Public()` — the safe default for an internal tool that holds mailbox
+ * with `@Public()` — the safe default for a service that holds mailbox
  * credentials.
  */
 @Injectable()
@@ -78,6 +78,9 @@ export class JwtAuthGuard implements CanActivate {
  * Accepts the token from the Authorization header or from the `ims_session`
  * cookie. The UI uses the header; the cookie exists so an operator can open an
  * export or unsubscribe-preview URL directly in a browser tab.
+ *
+ * `ims` is the legacy internal name; the cookie keeps it so existing sessions
+ * survive the rename.
  */
 function extractToken(request: Request): string | null {
   const header = request.headers.authorization;
