@@ -6,10 +6,10 @@
 #   docker compose -f backend/docker-compose.yml up --build
 #
 # One service, like production: Postgres and Redis stay where they already are.
-# Locally that is the `local-postgres` container on host port 5433 and the
-# `tmx-redis` from the root compose file on 6379, so both are reached through
-# `host.docker.internal` — inside a container, "localhost" is the container.
-# Every other value comes from backend/.env unchanged.
+# Locally that is the root compose file's `tmx-postgres` on 5432 and
+# `tmx-redis` on 6379, so both are reached through `host.docker.internal` —
+# inside a container, "localhost" is the container. Every other value comes
+# from backend/.env unchanged.
 #
 # Explicit project name so `down --remove-orphans` stays scoped to this stack
 # and never touches sibling projects that also live in a "backend" directory.
@@ -34,9 +34,9 @@ services:
       - PORT=4000
       # DATABASE_URL and REDIS_URL in .env point at localhost, which inside a
       # container means the container itself. Rewritten to the host, where both
-      # services actually are. The ports match .env: 5433 for local-postgres,
-      # 6379 for the root compose file's Redis.
-      - DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5433/mail_scheduler?schema=public
+      # services actually are. The ports match the root compose file: 5432 for
+      # Postgres, 6379 for Redis.
+      - DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5432/mail_scheduler?schema=public
       - REDIS_URL=redis://host.docker.internal:6379
     # Docker Desktop resolves host.docker.internal on its own; on Linux it does
     # not exist until this maps it to the bridge gateway.

@@ -1,14 +1,30 @@
-# Local infrastructure for TMX Scheduler.
-#
-# Postgres is deliberately not here: the database lives in the existing
-# `local-postgres` container on 127.0.0.1:5433, in its own `mail_scheduler`
-# database alongside whatever else that server holds. DATABASE_URL in
-# backend/.env points at it.
+# Local infrastructure for TMX Scheduler: Postgres, Redis and Mailpit.
 #
 # Every port below is published on 127.0.0.1 only. Redis runs without
-# authentication, so binding it to 0.0.0.0 would put an open datastore on
-# whatever network the laptop is joined to.
+# authentication and Postgres with a throwaway password, so binding either to
+# 0.0.0.0 would put an open datastore on whatever network the laptop is joined
+# to.
 services:
+  # The default DATABASE_URL in backend/.env.example points here. A machine
+  # that already runs Postgres on 5432 can change the host port below and the
+  # URL together; nothing else reads it.
+  postgres:
+    image: postgres:16-alpine
+    container_name: tmx-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mail_scheduler
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mail_scheduler"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   redis:
     image: redis:7-alpine
     container_name: tmx-redis
@@ -35,4 +51,5 @@ services:
       - "127.0.0.1:1025:1025"
 
 volumes:
+  postgres-data:
   redis-data:
