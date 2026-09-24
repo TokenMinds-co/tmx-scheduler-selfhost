@@ -1,13 +1,15 @@
-name: Backend CI/CD
+name: Deploy
 
+# Ships `main` to the server: build the backend image, push it to GHCR, pull
+# it on the server, verify it answers. Every check that can fail a change
+# lives in ci.yml; this workflow assumes the commit already passed there.
+#
 # Path-scoped, because this is a monorepo and the frontend deploys separately.
 # A frontend-only or docs-only push should not rebuild and redeploy the API.
 # `backend/**` covers the Dockerfile and both compose files, which live there.
 on:
   push:
     branches: [main]
-    # Kept in sync by hand with the pull_request list below — GitHub's workflow
-    # parser does not resolve YAML anchors, so the duplication is unavoidable.
     paths:
       - 'backend/**'
       - 'packages/shared/**'
@@ -15,18 +17,7 @@ on:
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
       - '.dockerignore'
-      - '.github/workflows/backend.yml'
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened]
-    paths:
-      - 'backend/**'
-      - 'packages/shared/**'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - 'pnpm-workspace.yaml'
-      - '.dockerignore'
-      - '.github/workflows/backend.yml'
+      - '.github/workflows/deploy.yml'
   # Escape hatch: redeploy the current main without an empty commit.
   workflow_dispatch:
 
@@ -34,72 +25,26 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: tmx-scheduler-backend
 
-# One run per branch. cancel-in-progress is off on purpose: a run that reaches
+# One run per ref. cancel-in-progress is off on purpose: a run that reaches
 # the deploy job is touching the server, and cancelling mid-deploy is worse
-# than queueing.
-#
-# This groups by ref, so it does NOT stop a manual dispatch from another branch
-# deploying on top of main — the deploy job carries its own single-slot group
-# for that.
+# than queueing. The deploy job carries its own single-slot group so a manual
+# dispatch cannot land on top of a push.
 concurrency:
-  group: backend-${{ github.ref }}
+  group: deploy-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   # -------------------------------------------------------------------------
-  # Pull requests: prove it type-checks and builds. The unit tests are not run
-  # in CI — run them locally with `pnpm --filter backend test`.
-  # -------------------------------------------------------------------------
-  build-check:
-    name: Build Check
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      # No version here: the action reads `packageManager` from the root
-      # package.json, so CI, the Dockerfile (via corepack) and every developer
-      # run the same pnpm.
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'pnpm'
-
-      # The backend's postinstall runs `prisma generate`, so the client exists
-      # before the type check without a separate step.
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile --filter backend...
-
-      # Before anything else: the backend imports @tmx-scheduler/shared through its
-      # dist/, which does not exist until this runs.
-      - name: Build shared contracts
-        run: pnpm --filter @tmx-scheduler/shared build
-
-      - name: Type check
-        run: pnpm --filter backend typecheck
-
-      - name: Build
-        run: pnpm --filter backend build
-
-  # -------------------------------------------------------------------------
   # Build the image and push it to GHCR.
   #
-  # Main only: a pull request is checked by `build-check` above and never
-  # reaches the server. There is one server, and letting every PR push to it
-  # meant whichever branch built last was what production ran.
-  #
-  # To exercise a branch on the server again, remove the `if` here and on
-  # `deploy`. Nothing else is PR-specific — the checkout ref, the tags and
-  # DEPLOY_REF below already handle a pull_request event.
+  # Guarded to this repository: a fork inherits the workflow but not the
+  # secrets or the server, so there it is a no-op rather than a red run. To
+  # deploy a fork to your own server, change the name in both `if`s and add
+  # the secrets — see docs/deployment.md.
   # -------------------------------------------------------------------------
   build-and-push:
     name: Build & Push Image
-    if: github.event_name != 'pull_request'
+    if: github.repository == 'TokenMinds-co/tmx-scheduler'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -108,14 +53,8 @@ jobs:
       image: ${{ steps.image.outputs.image }}
       image_tag: ${{ steps.sha.outputs.short_sha }}
     steps:
-      # On a pull_request event the default checkout is the *merge* commit,
-      # which exists only on the runner. Build the branch head instead: it is
-      # what the server checks out, and it is a real commit someone can go look
-      # at when a deployed build misbehaves.
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       # --short alone gives however many characters git thinks are unambiguous,
       # which can grow. The tag, the COMMIT_SHA in the image and the string the
@@ -126,7 +65,7 @@ jobs:
         run: echo "short_sha=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
 
       # GHCR rejects uppercase in a path, and GitHub org names are not
-      # lowercased for us (TokenMinds-co).
+      # lowercased for us.
       - name: Lowercase repository owner
         id: owner
         run: echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
@@ -156,22 +95,16 @@ jobs:
           # The sha tag is `type=raw` off the step above rather than
           # `type=sha`, so that the tag, the COMMIT_SHA baked into the image and
           # the value the deploy pulls are the same string by construction.
-          # `type=sha` derives its own, and on a pull_request event it resolves
-          # against a different commit than the runner has checked out — the
-          # deploy would then pull a tag that was never pushed.
-          #
-          # production-latest stays a main-only pointer. A PR build is a real
-          # image with a real tag, but it is not what "current" means.
           tags: |
             type=raw,value=${{ steps.sha.outputs.short_sha }}
-            type=raw,value=production-latest,enable=${{ github.event_name != 'pull_request' }}
+            type=raw,value=production-latest
 
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./backend/Dockerfile
-          # The VPS is x86; the runner is too, so this is a native build.
+          # The server is x86; the runner is too, so this is a native build.
           platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -183,12 +116,10 @@ jobs:
 
   # -------------------------------------------------------------------------
   # Pull the image on the server, restart the backend, verify it answers.
-  #
-  # Main only — see the note on `build-and-push`.
   # -------------------------------------------------------------------------
   deploy:
     name: Deploy to Server
-    if: github.event_name != 'pull_request'
+    if: github.repository == 'TokenMinds-co/tmx-scheduler'
     needs: build-and-push
     runs-on: ubuntu-latest
     permissions:
@@ -196,11 +127,9 @@ jobs:
       # The server pulls from GHCR with the token this job hands it.
       packages: read
     # There is one server, so every deploy takes the same single slot no matter
-    # which branch it came from. The workflow-level group is per-ref and would
-    # happily let a manual dispatch and main run `compose up` on top of each
-    # other.
+    # what triggered it.
     concurrency:
-      group: backend-deploy
+      group: deploy-server
       cancel-in-progress: false
     steps:
       - name: SSH deploy
@@ -276,16 +205,10 @@ jobs:
 
             echo "[deploy] done: $IMAGE_FULL:$IMAGE_TAG"
         env:
-          # Paths on the server holding the repo clone (compose file + .env).
+          # Path on the server holding the repo clone (compose file + .env).
           DEPLOY_PATH: 'tmx-scheduler'
           COMPOSE_FILE: backend/docker-compose-production.yml
-          # head_ref is set only on pull_request events and holds the real
-          # source branch; ref_name there would be "<PR-number>/merge", which
-          # the server cannot check out. This is what lets a PR deploy at all,
-          # and it assumes the PR comes from a branch in this repo rather than
-          # a fork — a fork's branch is not on origin, and a fork PR gets no
-          # secrets to reach the server with either way.
-          DEPLOY_REF: ${{ github.head_ref || github.ref_name }}
+          DEPLOY_REF: ${{ github.ref_name }}
           REGISTRY: ${{ env.REGISTRY }}
           IMAGE_FULL: ${{ needs.build-and-push.outputs.image }}
           IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
