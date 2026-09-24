@@ -21,7 +21,6 @@ import { sanitizeSignatureHtml, htmlToText } from './html';
 
 const FILLED: SignatureFields = {
   fullName: 'Ada Lovelace',
-  fullName: 'Ada Lovelace',
   jobTitle: 'Chief Executive Officer',
   company: 'Example Ltd',
   photoUrl: 'https://cdn.example.com/ada.png',
@@ -31,11 +30,7 @@ const FILLED: SignatureFields = {
   email: 'ada@example.com',
   phone: '+1 555 0100',
   address: '1 Example Street #01-01, Example City 000000',
-  email: 'ada@example.com',
-  phone: '+1 555 0100',
-  address: '1 Example Street #01-01, Example City 000000',
   ctaText: 'See the full video of how it works',
-  ctaUrl: 'https://videos.example.com/intro',
   ctaUrl: 'https://videos.example.com/intro',
   accentColor: '#1d4ed8',
 };
@@ -53,9 +48,6 @@ describe('sender placeholder', () => {
   });
 
   it('fills in as a working mailto link', () => {
-    const filled = fillSignature(html, 'ada@inbox.example.com', 'html');
-    expect(filled).toContain('href="mailto:ada@inbox.example.com"');
-    expect(filled).toContain('>ada@inbox.example.com</a>');
     const filled = fillSignature(html, 'ada@inbox.example.com', 'html');
     expect(filled).toContain('href="mailto:ada@inbox.example.com"');
     expect(filled).toContain('>ada@inbox.example.com</a>');
