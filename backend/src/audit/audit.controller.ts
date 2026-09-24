@@ -1,4 +1,10 @@
-import { Controller, DefaultValuePipe, Get, ParseIntPipe, Query } from '@nestjs/common';
+import {
+  Controller,
+  DefaultValuePipe,
+  Get,
+  ParseIntPipe,
+  Query,
+} from '@nestjs/common';
 import { AuditService } from './audit.service';
 import { Roles } from '../auth/jwt-auth.guard';
 
@@ -12,6 +18,9 @@ export class AuditController {
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('pageSize', new DefaultValuePipe(50), ParseIntPipe) pageSize: number,
   ) {
-    return this.audit.list(Math.max(1, page), Math.min(200, Math.max(1, pageSize)));
+    return this.audit.list(
+      Math.max(1, page),
+      Math.min(200, Math.max(1, pageSize)),
+    );
   }
 }

@@ -1,4 +1,7 @@
-import { decodeSignatureState, normaliseSignatureUrl } from '@tmx-scheduler/shared';
+import {
+  decodeSignatureState,
+  normaliseSignatureUrl,
+} from '@tmx-scheduler/shared';
 
 /**
  * Whether a message will carry a link that tracking can follow.

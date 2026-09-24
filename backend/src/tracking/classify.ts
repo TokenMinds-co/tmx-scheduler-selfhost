@@ -228,7 +228,9 @@ export function judge(
 }
 
 /** Rules read from the environment, so a threshold change needs no deploy. */
-export function rulesFromEnv(env: NodeJS.ProcessEnv = process.env): TrackingRules {
+export function rulesFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): TrackingRules {
   const number = (key: string, fallback: number): number => {
     const parsed = Number(env[key]);
     return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;

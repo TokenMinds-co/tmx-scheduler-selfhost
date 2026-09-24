@@ -105,7 +105,7 @@ update — not true of a job already delayed inside Redis. Both claims are singl
 atomic statements, so any number of API instances can run without a lock.
 
 The poller's claim uses `FOR UPDATE SKIP LOCKED`, so concurrent pollers each
-take a *different* due row instead of queueing behind the same one.
+take a _different_ due row instead of queueing behind the same one.
 
 **Retries live on the queue row**, not in BullMQ. The dashboard has to show
 the attempt count and the next attempt time, and two independent retry
@@ -160,26 +160,26 @@ sent is re-judged on the next page load; nothing has to be collected again.
 
 ### Failure handling
 
-| Outcome | Treatment |
-|---|---|
-| 4xx SMTP reply | Transient. Retried at 1m, 4m, 15m (±20% jitter), then failed. |
-| 5xx SMTP reply | Permanent → `failed`. |
-| 5xx naming the recipient (550/551/553) | Hard bounce → address suppressed, remaining mail to it cancelled. |
-| 5xx about quota or rate | Treated as transient — the mailbox is over quota, not wrong. |
-| Connection error (no SMTP reply) | Transient, and the daily slot is given back: nothing was sent. |
-| Daily limit reached | Deferred to 9 AM the next send day, in the mailbox's zone. Not an attempt. |
-| Pacing gap not open | Deferred to when it opens, plus jitter. Not an attempt. |
+| Outcome                                | Treatment                                                                  |
+| -------------------------------------- | -------------------------------------------------------------------------- |
+| 4xx SMTP reply                         | Transient. Retried at 1m, 4m, 15m (±20% jitter), then failed.              |
+| 5xx SMTP reply                         | Permanent → `failed`.                                                      |
+| 5xx naming the recipient (550/551/553) | Hard bounce → address suppressed, remaining mail to it cancelled.          |
+| 5xx about quota or rate                | Treated as transient — the mailbox is over quota, not wrong.               |
+| Connection error (no SMTP reply)       | Transient, and the daily slot is given back: nothing was sent.             |
+| Daily limit reached                    | Deferred to 9 AM the next send day, in the mailbox's zone. Not an attempt. |
+| Pacing gap not open                    | Deferred to when it opens, plus jitter. Not an attempt.                    |
 
 ## Import format
 
-| Column | Notes |
-|---|---|
-| Sending Email | Must match a configured, active mailbox |
-| First Name, Last Name, Company | Optional, used for personalisation |
-| Email | Recipient |
-| Schedule | **Must carry a timezone** — see below |
-| Message, Subject | May use `{{firstName}}`, `{{lastName}}`, `{{company}}`, `{{email}}` |
-| Group | Campaign label; drives filtering and bulk actions |
+| Column                         | Notes                                                               |
+| ------------------------------ | ------------------------------------------------------------------- |
+| Sending Email                  | Must match a configured, active mailbox                             |
+| First Name, Last Name, Company | Optional, used for personalisation                                  |
+| Email                          | Recipient                                                           |
+| Schedule                       | **Must carry a timezone** — see below                               |
+| Message, Subject               | May use `{{firstName}}`, `{{lastName}}`, `{{company}}`, `{{email}}` |
+| Group                          | Campaign label; drives filtering and bulk actions                   |
 
 `Schedule` may be a plain date and time (`Sep 10 2026 9:00 AM`), in which case
 the **timezone chosen on the import screen** is applied to it. A cell may carry
@@ -209,7 +209,7 @@ The tool enforces what it can; the rest is operational discipline.
 - **Unsubscribe works.** Every campaign message carries a signed link plus
   RFC 8058 `List-Unsubscribe` / `List-Unsubscribe-Post` headers, so Gmail and
   Outlook render their native unsubscribe button. Using it suppresses the
-  address *and* cancels everything still queued for it.
+  address _and_ cancels everything still queued for it.
 - **Spread a campaign across mailboxes** rather than maxing one out.
 
 Cold outreach from Gmail and Google Workspace runs against their bulk-sender
@@ -243,7 +243,7 @@ separate decision from the storage engine.
 - Session, unsubscribe and tracking links are signed with three separate
   secrets, so a leaked tracking URL can never be replayed as a session.
 - Every mailbox edit, import and bulk action is written to an append-only audit
-  log, secret *values* excluded.
+  log, secret _values_ excluded.
 - Signature HTML is sanitised server-side before storage and before sending —
   whether it came from the template builder or was pasted in by hand.
 - The admin session token is kept in `localStorage` and sent as a header, not
@@ -260,19 +260,19 @@ To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
 See `backend/.env.example` for the full list. The ones that matter:
 
-| Variable | Purpose |
-|---|---|
-| `DATABASE_URL`, `REDIS_URL` | Postgres and Redis. Default to the root `docker-compose.yml` services. |
-| `CREDS_KEY` | 32 bytes base64. Encrypts stored secrets. Boot fails if wrong length. |
-| `JWT_SECRET`, `UNSUBSCRIBE_SECRET`, `TRACKING_SECRET` | Separate keys, so no token issued for one purpose is valid for another. |
-| `PUBLIC_API_URL` | Base for unsubscribe links inside outgoing mail. |
-| `TRACKING_BASE_URL` | Host tracking links point at. Defaults to `PUBLIC_API_URL`; give it a subdomain of the sending domain in production. |
-| `CORS_ORIGINS` | Origins allowed to call the API — the UI's origin. |
-| `POLL_INTERVAL_MS`, `CLAIM_BATCH_SIZE` | Poller cadence and per-tick budget. |
-| `SEND_CONCURRENCY` | Ceiling across all mailboxes; per-mailbox pacing is separate. |
-| `STUCK_SENDING_TIMEOUT_MS` | How long a claim may sit before the reaper takes it back. |
-| `DRY_RUN_SENDING` | Logs messages instead of sending. Use for a first run against real data. |
-| `SEED_ADMIN_*` | The first admin, created on boot when no user exists. |
+| Variable                                              | Purpose                                                                                                              |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`, `REDIS_URL`                           | Postgres and Redis. Default to the root `docker-compose.yml` services.                                               |
+| `CREDS_KEY`                                           | 32 bytes base64. Encrypts stored secrets. Boot fails if wrong length.                                                |
+| `JWT_SECRET`, `UNSUBSCRIBE_SECRET`, `TRACKING_SECRET` | Separate keys, so no token issued for one purpose is valid for another.                                              |
+| `PUBLIC_API_URL`                                      | Base for unsubscribe links inside outgoing mail.                                                                     |
+| `TRACKING_BASE_URL`                                   | Host tracking links point at. Defaults to `PUBLIC_API_URL`; give it a subdomain of the sending domain in production. |
+| `CORS_ORIGINS`                                        | Origins allowed to call the API — the UI's origin.                                                                   |
+| `POLL_INTERVAL_MS`, `CLAIM_BATCH_SIZE`                | Poller cadence and per-tick budget.                                                                                  |
+| `SEND_CONCURRENCY`                                    | Ceiling across all mailboxes; per-mailbox pacing is separate.                                                        |
+| `STUCK_SENDING_TIMEOUT_MS`                            | How long a claim may sit before the reaper takes it back.                                                            |
+| `DRY_RUN_SENDING`                                     | Logs messages instead of sending. Use for a first run against real data.                                             |
+| `SEED_ADMIN_*`                                        | The first admin, created on boot when no user exists.                                                                |
 
 New mailboxes default to the `Asia/Singapore` timezone; each mailbox's zone is
 editable in its form.

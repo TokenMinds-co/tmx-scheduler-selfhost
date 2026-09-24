@@ -57,10 +57,7 @@ export const EMPTY_SIGNATURE_FIELDS: SignatureFields = {
 };
 
 export type SignatureTemplateId =
-  | 'photo-card'
-  | 'logo-left'
-  | 'stacked'
-  | 'minimal';
+  'photo-card' | 'logo-left' | 'stacked' | 'minimal';
 
 export interface SignatureTemplate {
   id: SignatureTemplateId;
@@ -299,7 +296,9 @@ function ruleBlock(): string {
 function contactBlock(r: Resolved): string {
   const inline: string[] = [];
   if (r.website) {
-    inline.push(`<b>Web</b> ${link(r.website.href, r.website.label, r.accent)}`);
+    inline.push(
+      `<b>Web</b> ${link(r.website.href, r.website.label, r.accent)}`,
+    );
   }
   if (r.email) {
     inline.push(`<b>Email</b> ${link(`mailto:${r.email}`, r.email, r.accent)}`);
@@ -337,7 +336,12 @@ function ctaBlock(r: Resolved): string {
  * everything else reads the style, and `height:auto` is what stops a client
  * from stretching a logo to its intrinsic pixel height.
  */
-function image(url: string, alt: string, width: number, padding: string): string {
+function image(
+  url: string,
+  alt: string,
+  width: number,
+  padding: string,
+): string {
   if (!url) return '';
   return (
     `<img src="${esc(url)}" alt="${esc(alt)}" width="${width}" ` +
@@ -356,12 +360,7 @@ function table(body: string): string {
 }
 
 function detailsColumn(r: Resolved): string {
-  return [
-    nameBlock(r),
-    roleBlock(r),
-    ruleBlock(),
-    contactBlock(r),
-  ].join('');
+  return [nameBlock(r), roleBlock(r), ruleBlock(), contactBlock(r)].join('');
 }
 
 // ---------------------------------------------------------------------------

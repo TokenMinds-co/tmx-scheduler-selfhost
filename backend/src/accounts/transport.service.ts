@@ -154,7 +154,10 @@ export class TransportService implements OnModuleDestroy {
       );
     }
 
-    const endpoint = this.tokenEndpoint(account.authType, account.oauthTenantId);
+    const endpoint = this.tokenEndpoint(
+      account.authType,
+      account.oauthTenantId,
+    );
     const body = new URLSearchParams({
       client_id: account.oauthClientId,
       client_secret: this.crypto.decrypt(account.oauthClientSecretEnc),

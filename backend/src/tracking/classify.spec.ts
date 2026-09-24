@@ -23,7 +23,8 @@ describe('judge', () => {
 
     it('accepts a hit exactly on the cut-off', () => {
       expect(
-        judge({ ...human, delaySeconds: DEFAULT_RULES.minDelaySeconds }).verdict,
+        judge({ ...human, delaySeconds: DEFAULT_RULES.minDelaySeconds })
+          .verdict,
       ).toBe('counted');
     });
 

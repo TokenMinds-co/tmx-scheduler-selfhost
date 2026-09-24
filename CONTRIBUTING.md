@@ -29,16 +29,16 @@ that makes no sense.
 
 ## Scripts
 
-| Command | What it does |
-|---|---|
-| `pnpm dev` | API on :4000 and UI on :3000, both watching |
-| `pnpm test` | Backend unit tests (Jest) |
-| `pnpm typecheck` | `tsc --noEmit` in every package |
-| `pnpm lint` / `pnpm lint:fix` | ESLint |
-| `pnpm format` / `pnpm format:check` | Prettier |
-| `pnpm build` | shared → backend → frontend |
-| `pnpm --filter backend db:migrate --name <snake_case>` | Create a migration from schema changes |
-| `pnpm --filter backend db:studio` | Browse the local database |
+| Command                                                | What it does                                |
+| ------------------------------------------------------ | ------------------------------------------- |
+| `pnpm dev`                                             | API on :4000 and UI on :3000, both watching |
+| `pnpm test`                                            | Backend unit tests (Jest)                   |
+| `pnpm typecheck`                                       | `tsc --noEmit` in every package             |
+| `pnpm lint` / `pnpm lint:fix`                          | ESLint                                      |
+| `pnpm format` / `pnpm format:check`                    | Prettier                                    |
+| `pnpm build`                                           | shared → backend → frontend                 |
+| `pnpm --filter backend db:migrate --name <snake_case>` | Create a migration from schema changes      |
+| `pnpm --filter backend db:studio`                      | Browse the local database                   |
 
 CI runs `typecheck`, `lint`, `format:check`, `test` and `build`, so running
 them locally first saves a round trip.

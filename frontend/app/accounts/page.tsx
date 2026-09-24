@@ -327,9 +327,7 @@ export default function AccountsPage() {
           ))}
         </div>
       )}
-      {accounts.error && (
-        <Alert>{(accounts.error as Error).message}</Alert>
-      )}
+      {accounts.error && <Alert>{(accounts.error as Error).message}</Alert>}
 
       <div className="grid gap-4 lg:grid-cols-2">
         {accounts.data?.map((account) => (

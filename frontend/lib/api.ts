@@ -1,7 +1,6 @@
 'use client';
 
-const BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api';
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api';
 
 // `ims` is the legacy internal name; kept so existing sessions survive the rename.
 const TOKEN_KEY = 'ims_token';
@@ -56,7 +55,10 @@ export async function api<T>(
   const url = new URL(`${BASE_URL}${path}`);
   for (const [key, value] of Object.entries(options.query ?? {})) {
     if (value === undefined || value === '') continue;
-    url.searchParams.set(key, Array.isArray(value) ? value.join(',') : String(value));
+    url.searchParams.set(
+      key,
+      Array.isArray(value) ? value.join(',') : String(value),
+    );
   }
 
   const headers: Record<string, string> = {};
@@ -67,7 +69,9 @@ export async function api<T>(
   const response = await fetch(url.toString(), {
     method: options.method ?? 'GET',
     headers,
-    body: options.formData ?? (options.body !== undefined ? JSON.stringify(options.body) : undefined),
+    body:
+      options.formData ??
+      (options.body !== undefined ? JSON.stringify(options.body) : undefined),
   });
 
   if (response.status === 401 && typeof window !== 'undefined') {
@@ -101,4 +105,4 @@ export async function api<T>(
 }
 
 /** SWR fetcher: `useSWR('/accounts', fetcher)`. */
-export const fetcher = <T,>(path: string) => api<T>(path);
+export const fetcher = <T>(path: string) => api<T>(path);

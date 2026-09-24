@@ -81,10 +81,7 @@ export class SuppressionController {
    */
   @Roles('admin')
   @Delete(':email')
-  async remove(
-    @Param('email') email: string,
-    @CurrentUser() actor: AuthUser,
-  ) {
+  async remove(@Param('email') email: string, @CurrentUser() actor: AuthUser) {
     await this.suppression.remove(email);
     await this.audit.record(actor, 'suppression.remove', email, null);
     return { ok: true };

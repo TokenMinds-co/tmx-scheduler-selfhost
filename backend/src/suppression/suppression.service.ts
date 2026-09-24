@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { Paginated, SuppressionDto, SuppressionReason } from '@tmx-scheduler/shared';
+import {
+  Paginated,
+  SuppressionDto,
+  SuppressionReason,
+} from '@tmx-scheduler/shared';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()

@@ -69,17 +69,36 @@ export class EmailsController {
   async export(@Query() query: QueueQueryDto): Promise<string> {
     const page = await this.emails.list(toFilter(query), 1, 5000);
     const header = [
-      'Sending Email', 'Email', 'First Name', 'Last Name', 'Company',
-      'Group', 'Subject', 'Scheduled (UTC)', 'Status', 'Attempts',
-      'Sent At', 'Last Error',
+      'Sending Email',
+      'Email',
+      'First Name',
+      'Last Name',
+      'Company',
+      'Group',
+      'Subject',
+      'Scheduled (UTC)',
+      'Status',
+      'Attempts',
+      'Sent At',
+      'Last Error',
     ];
     const rows = page.items.map((email) => [
-      email.sendingEmail, email.toEmail, email.firstName ?? '',
-      email.lastName ?? '', email.company ?? '', email.group ?? '',
-      email.subject, email.scheduledAt, email.status, String(email.attempts),
-      email.sentAt ?? '', email.lastError ?? '',
+      email.sendingEmail,
+      email.toEmail,
+      email.firstName ?? '',
+      email.lastName ?? '',
+      email.company ?? '',
+      email.group ?? '',
+      email.subject,
+      email.scheduledAt,
+      email.status,
+      String(email.attempts),
+      email.sentAt ?? '',
+      email.lastError ?? '',
     ]);
-    return [header, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n');
+    return [header, ...rows]
+      .map((row) => row.map(csvCell).join(','))
+      .join('\r\n');
   }
 
   @Get(':id')
@@ -99,10 +118,7 @@ export class EmailsController {
    * cancelled anything.
    */
   @Post('bulk/cancel')
-  async bulkCancel(
-    @Body() dto: BulkActionDto,
-    @CurrentUser() actor: AuthUser,
-  ) {
+  async bulkCancel(@Body() dto: BulkActionDto, @CurrentUser() actor: AuthUser) {
     const filter = toFilter(dto);
     assertNarrowed(filter, 'cancel');
     const cancelled = await this.emails.cancelMany(filter);

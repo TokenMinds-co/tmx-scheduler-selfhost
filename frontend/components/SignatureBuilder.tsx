@@ -158,7 +158,10 @@ export function SignatureBuilder({
   function emit(nextTemplate: SignatureTemplateId, next: SignatureFields) {
     const html = renderSignatureHtml(nextTemplate, next);
     onChange({
-      html: withSignatureState(html, { templateId: nextTemplate, fields: next }),
+      html: withSignatureState(html, {
+        templateId: nextTemplate,
+        fields: next,
+      }),
       text: renderSignatureText(next),
     });
   }

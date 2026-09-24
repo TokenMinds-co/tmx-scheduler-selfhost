@@ -6,11 +6,11 @@ real one.
 
 ## Supported versions
 
-| Version | Supported |
-|---|---|
-| `main` | Yes |
-| Latest `0.x` release | Yes |
-| Anything older | No — please upgrade first |
+| Version              | Supported                 |
+| -------------------- | ------------------------- |
+| `main`               | Yes                       |
+| Latest `0.x` release | Yes                       |
+| Anything older       | No — please upgrade first |
 
 ## Reporting a vulnerability
 

@@ -87,12 +87,7 @@ export class SendProcessor extends WorkerHost implements OnModuleInit {
     if (!claim.ok) {
       // Not a failure: the mailbox is pacing itself. The message goes back to
       // `pending` at the time the gate reopens, without consuming an attempt.
-      await this.emails.deferTo(
-        email.id,
-        claim.retryAt,
-        claim.detail,
-        false,
-      );
+      await this.emails.deferTo(email.id, claim.retryAt, claim.detail, false);
       this.logger.debug(
         `Deferred ${email.toEmail} to ${claim.retryAt.toISOString()}: ${claim.reason}`,
       );

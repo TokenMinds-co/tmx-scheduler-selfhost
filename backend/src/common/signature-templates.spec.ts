@@ -55,7 +55,10 @@ describe('sender placeholder', () => {
   });
 
   it('fills in the text half too', () => {
-    const text = renderSignatureText({ ...FILLED, email: SENDER_EMAIL_PLACEHOLDER });
+    const text = renderSignatureText({
+      ...FILLED,
+      email: SENDER_EMAIL_PLACEHOLDER,
+    });
     expect(fillSignature(text, 'ada@inbox.example.com', 'text')).toContain(
       'Email: ada@inbox.example.com',
     );
@@ -106,7 +109,9 @@ describe('signature templates', () => {
       });
 
       it('renders nothing at all from an empty form', () => {
-        expect(renderSignatureHtml(template.id, EMPTY_SIGNATURE_FIELDS)).toBe('');
+        expect(renderSignatureHtml(template.id, EMPTY_SIGNATURE_FIELDS)).toBe(
+          '',
+        );
       });
     });
   }

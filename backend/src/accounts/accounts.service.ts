@@ -297,7 +297,8 @@ export class AccountsService {
     // The claim failed; work out which of the two gates closed so the caller
     // can reschedule to a time that will actually succeed.
     const atLimit =
-      account.sentTodayDate === today && account.sentToday >= account.dailyLimit;
+      account.sentTodayDate === today &&
+      account.sentToday >= account.dailyLimit;
     if (atLimit) {
       return {
         ok: false,
@@ -481,8 +482,8 @@ export class AccountsService {
       hasPassword: Boolean(account.smtpPasswordEnc),
       hasOAuthCredentials: Boolean(
         account.oauthClientId &&
-          account.oauthClientSecretEnc &&
-          account.oauthRefreshTokenEnc,
+        account.oauthClientSecretEnc &&
+        account.oauthRefreshTokenEnc,
       ),
       signatureId: account.signatureId,
       signatureName: account.signature?.name ?? null,

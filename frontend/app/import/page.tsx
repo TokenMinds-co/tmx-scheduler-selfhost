@@ -4,7 +4,11 @@ import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
 import { useRef, useState, type DragEvent } from 'react';
 import type { AccountDto, ImportResult } from '@tmx-scheduler/shared';
-import { COMMON_TIMEZONES, DEFAULTS, IMPORT_COLUMNS } from '@tmx-scheduler/shared';
+import {
+  COMMON_TIMEZONES,
+  DEFAULTS,
+  IMPORT_COLUMNS,
+} from '@tmx-scheduler/shared';
 import { Shell } from '@/components/Shell';
 import { ICONS, Icon } from '@/components/icons';
 import { api, fetcher } from '@/lib/api';
@@ -326,11 +330,13 @@ export default function ImportPage() {
               {committed.batch ? (
                 <>
                   {' '}
-                  as batch {committed.batch.number}, “{committed.batch.name}
-                  ”
+                  as batch {committed.batch.number}, “{committed.batch.name}”
                 </>
               ) : (
-                <> — every row was already in the queue, so no batch was opened</>
+                <>
+                  {' '}
+                  — every row was already in the queue, so no batch was opened
+                </>
               )}
               .{' '}
               <button
@@ -417,7 +423,8 @@ export default function ImportPage() {
                   />
                   <p className="border-t border-border px-4 py-2 text-xs text-muted">
                     These rows are skipped. Fix them in the sheet and import
-                    again — already-queued rows will be recognised as duplicates.
+                    again — already-queued rows will be recognised as
+                    duplicates.
                   </p>
                 </Card>
               )}
@@ -437,11 +444,11 @@ export default function ImportPage() {
           </ul>
           <div className="space-y-2 border-t border-border px-4 py-3 text-xs leading-relaxed text-muted">
             <p>
-              <strong className="text-ink">Schedule</strong> can be a plain
-              date and time — <code>Sep 10 2026 9:00 AM</code> — and the
-              timezone chosen on the left is applied to it. A cell may still
-              carry its own zone (<code>Sep 10 2026 9:00 AM SGT</code>), which
-              overrides the dropdown for that row.
+              <strong className="text-ink">Schedule</strong> can be a plain date
+              and time — <code>Sep 10 2026 9:00 AM</code> — and the timezone
+              chosen on the left is applied to it. A cell may still carry its
+              own zone (<code>Sep 10 2026 9:00 AM SGT</code>), which overrides
+              the dropdown for that row.
             </p>
             <p>
               <strong className="text-ink">Message</strong> and{' '}

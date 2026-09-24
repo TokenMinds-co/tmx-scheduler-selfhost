@@ -34,7 +34,11 @@ export function fromLocalInputValue(value: string): string {
 export const localZone = (): string => DateTime.local().zoneName ?? 'UTC';
 
 /** `plural(3, 'message')` → "3 messages"; the "(s)" convention reads as unfinished. */
-export function plural(count: number, noun: string, pluralNoun?: string): string {
+export function plural(
+  count: number,
+  noun: string,
+  pluralNoun?: string,
+): string {
   const word = count === 1 ? noun : (pluralNoun ?? `${noun}s`);
   return `${count.toLocaleString()} ${word}`;
 }

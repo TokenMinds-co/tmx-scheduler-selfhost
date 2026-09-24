@@ -37,7 +37,10 @@ export class AuditService {
     }
   }
 
-  async list(page: number, pageSize: number): Promise<Paginated<AuditEntryDto>> {
+  async list(
+    page: number,
+    pageSize: number,
+  ): Promise<Paginated<AuditEntryDto>> {
     const [items, total] = await Promise.all([
       this.prisma.auditEntry.findMany({
         orderBy: { createdAt: 'desc' },

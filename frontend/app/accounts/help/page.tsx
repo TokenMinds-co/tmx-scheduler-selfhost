@@ -125,7 +125,8 @@ const PROVIDERS: Provider[] = [
         body: (
           <>
             Choose the org unit this mailbox belongs to in the left-hand panel,
-            then tick <strong>Allow users to turn on 2-Step Verification</strong>.
+            then tick{' '}
+            <strong>Allow users to turn on 2-Step Verification</strong>.
             Enforcement is a separate setting below it and is not needed here.
           </>
         ),
@@ -782,8 +783,8 @@ export default function MailboxSetupPage() {
       ready: usesOAuth
         ? Boolean(
             draft.oauthClientId.trim() &&
-              draft.oauthClientSecret.trim() &&
-              draft.oauthRefreshToken.trim(),
+            draft.oauthClientSecret.trim() &&
+            draft.oauthRefreshToken.trim(),
           )
         : draft.smtpPassword.length > 0,
       content: (
@@ -990,16 +991,19 @@ export default function MailboxSetupPage() {
                   onChange={(e) => set('minGapSeconds', Number(e.target.value))}
                 />
               </Field>
-              <Field label="Timezone" hint="The daily limit renews at 9 AM in this zone, not at midnight.">
+              <Field
+                label="Timezone"
+                hint="The daily limit renews at 9 AM in this zone, not at midnight."
+              >
                 <Select
                   value={draft.timezone}
                   onChange={(e) => set('timezone', e.target.value)}
                 >
-                {COMMON_TIMEZONES.map((tz) => (
-                  <option key={tz.value} value={tz.value}>
-                    {tz.label}
-                  </option>
-                ))}
+                  {COMMON_TIMEZONES.map((tz) => (
+                    <option key={tz.value} value={tz.value}>
+                      {tz.label}
+                    </option>
+                  ))}
                 </Select>
               </Field>
             </div>
@@ -1013,8 +1017,8 @@ export default function MailboxSetupPage() {
         content: (
           <div className="space-y-3">
             <p className="text-sm leading-relaxed text-muted">
-              Appended to every message this mailbox sends. Signatures live in
-              a shared library, so one can serve several mailboxes — its email
+              Appended to every message this mailbox sends. Signatures live in a
+              shared library, so one can serve several mailboxes — its email
               line always shows the sending mailbox&rsquo;s own address.
               Optional — you can attach one later.
             </p>

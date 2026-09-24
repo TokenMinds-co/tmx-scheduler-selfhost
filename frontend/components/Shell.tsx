@@ -129,7 +129,6 @@ function crumbsFor(pathname: string): string[] {
   return [];
 }
 
-
 // `ims` is the legacy internal name; kept so a collapsed sidebar stays collapsed.
 const COLLAPSE_KEY = 'ims_nav_collapsed';
 
@@ -187,12 +186,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const rail = (
     <div className="flex h-full flex-col">
       {/* Brand */}
-      <div
-        className={cx(
-          'px-5 py-5',
-          !wide && 'flex justify-center px-0',
-        )}
-      >
+      <div className={cx('px-5 py-5', !wide && 'flex justify-center px-0')}>
         <Link
           href="/queue"
           aria-label="TMX Scheduler"

@@ -1,4 +1,12 @@
-import { Controller, Get, Header, Param, Query, Req, Res } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Header,
+  Param,
+  Query,
+  Req,
+  Res,
+} from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { Public } from '../auth/jwt-auth.guard';

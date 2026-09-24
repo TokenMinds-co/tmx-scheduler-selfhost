@@ -47,8 +47,12 @@ export default function LoginPage() {
           T
         </span>
         <h1 className="flex items-baseline gap-1.5">
-          <span className="brand-text text-2xl font-extrabold tracking-tight">TMX</span>
-          <span className="text-lg font-semibold tracking-tight">Scheduler</span>
+          <span className="brand-text text-2xl font-extrabold tracking-tight">
+            TMX
+          </span>
+          <span className="text-lg font-semibold tracking-tight">
+            Scheduler
+          </span>
         </h1>
         <p className="mt-1 mb-5 text-sm text-muted">
           Sign in to manage mailboxes and the send queue.

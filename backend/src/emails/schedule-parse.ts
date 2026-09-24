@@ -1,8 +1,7 @@
 import { DateTime } from 'luxon';
 
 export type ParsedSchedule =
-  | { ok: true; utc: Date }
-  | { ok: false; reason: string };
+  { ok: true; utc: Date } | { ok: false; reason: string };
 
 /**
  * Timezone abbreviations that appear in the sheets, mapped to IANA zones.

@@ -32,7 +32,11 @@ export default defineConfig([
       // is part of the signature but unused here".
       '@typescript-eslint/no-unused-vars': [
         'error',
-        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrors: 'none' },
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrors: 'none',
+        },
       ],
     },
   },

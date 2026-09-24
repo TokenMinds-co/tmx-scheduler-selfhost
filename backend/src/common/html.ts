@@ -31,8 +31,27 @@ const LENGTH = [/^\d+(\.\d+)?(px|pt|em|%)?$/, /^auto$/];
 export function sanitizeSignatureHtml(html: string): string {
   return sanitizeHtml(html, {
     allowedTags: [
-      'a', 'b', 'br', 'div', 'em', 'font', 'i', 'img', 'li', 'ol', 'p',
-      'span', 'strong', 'table', 'tbody', 'td', 'th', 'thead', 'tr', 'u', 'ul',
+      'a',
+      'b',
+      'br',
+      'div',
+      'em',
+      'font',
+      'i',
+      'img',
+      'li',
+      'ol',
+      'p',
+      'span',
+      'strong',
+      'table',
+      'tbody',
+      'td',
+      'th',
+      'thead',
+      'tr',
+      'u',
+      'ul',
     ],
     allowedAttributes: {
       a: ['href', 'target', 'rel'],
@@ -40,11 +59,17 @@ export function sanitizeSignatureHtml(html: string): string {
       // `role="presentation"` keeps a layout table out of a screen reader's
       // table navigation; the rest is what Outlook reads instead of the styles.
       table: [
-        'role', 'width', 'cellpadding', 'cellspacing', 'border', 'bgcolor',
+        'role',
+        'width',
+        'cellpadding',
+        'cellspacing',
+        'border',
+        'bgcolor',
         // Where the template builder stores the fields it rendered from, so a
         // saved signature can be re-opened in the form instead of as raw HTML.
         // `ims` is the legacy internal name, baked into stored signatures.
-        'data-ims-signature', 'data-ims-signature-fields',
+        'data-ims-signature',
+        'data-ims-signature-fields',
       ],
       div: ['data-ims-signature', 'data-ims-signature-fields'],
       td: ['width', 'height', 'valign', 'colspan', 'rowspan', 'bgcolor'],

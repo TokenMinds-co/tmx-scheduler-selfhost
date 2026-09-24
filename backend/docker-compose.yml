@@ -41,15 +41,15 @@ services:
     # Docker Desktop resolves host.docker.internal on its own; on Linux it does
     # not exist until this maps it to the bridge gateway.
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - 'host.docker.internal:host-gateway'
     deploy:
       resources:
         limits:
           memory: 512M
-          cpus: "1.0"
+          cpus: '1.0'
         reservations:
           memory: 256M
-          cpus: "0.5"
+          cpus: '0.5'
     healthcheck:
       # /health answers 503 until Postgres is reachable, which is what makes
       # --spider (status line only) a real check.
@@ -57,12 +57,12 @@ services:
       # container and the app binds IPv4, so a localhost probe is refused.
       test:
         [
-          "CMD",
-          "wget",
-          "--no-verbose",
-          "--tries=1",
-          "--spider",
-          "http://127.0.0.1:4000/health",
+          'CMD',
+          'wget',
+          '--no-verbose',
+          '--tries=1',
+          '--spider',
+          'http://127.0.0.1:4000/health',
         ]
       interval: 30s
       timeout: 10s
@@ -70,9 +70,9 @@ services:
       start_period: 40s
     ports:
       # host (from .env PORT, default 4000) : container/app port (fixed 4000)
-      - "127.0.0.1:${PORT:-4000}:4000"
+      - '127.0.0.1:${PORT:-4000}:4000'
     logging:
-      driver: "json-file"
+      driver: 'json-file'
       options:
-        max-size: "10m"
-        max-file: "3"
+        max-size: '10m'
+        max-file: '3'

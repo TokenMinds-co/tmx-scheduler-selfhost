@@ -9,24 +9,24 @@ on:
     # Kept in sync by hand with the pull_request list below — GitHub's workflow
     # parser does not resolve YAML anchors, so the duplication is unavoidable.
     paths:
-      - "backend/**"
-      - "packages/shared/**"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-      - ".dockerignore"
-      - ".github/workflows/backend.yml"
+      - 'backend/**'
+      - 'packages/shared/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.dockerignore'
+      - '.github/workflows/backend.yml'
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened]
     paths:
-      - "backend/**"
-      - "packages/shared/**"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-      - ".dockerignore"
-      - ".github/workflows/backend.yml"
+      - 'backend/**'
+      - 'packages/shared/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.dockerignore'
+      - '.github/workflows/backend.yml'
   # Escape hatch: redeploy the current main without an empty commit.
   workflow_dispatch:
 
@@ -67,8 +67,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
-          cache: "pnpm"
+          node-version: '22'
+          cache: 'pnpm'
 
       # The backend's postinstall runs `prisma generate`, so the client exists
       # before the type check without a separate step.
@@ -277,7 +277,7 @@ jobs:
             echo "[deploy] done: $IMAGE_FULL:$IMAGE_TAG"
         env:
           # Paths on the server holding the repo clone (compose file + .env).
-          DEPLOY_PATH: "tmx-scheduler"
+          DEPLOY_PATH: 'tmx-scheduler'
           COMPOSE_FILE: backend/docker-compose-production.yml
           # head_ref is set only on pull_request events and holds the real
           # source branch; ref_name there would be "<PR-number>/merge", which

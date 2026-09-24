@@ -128,10 +128,10 @@ from the README roadmap.
 
 Two workflows in `.github/workflows/`:
 
-| Workflow | Runs on | Does |
-|---|---|---|
-| `ci.yml` | every push and pull request, any fork | install → build shared → typecheck → lint → format check → unit tests → build both apps; applies every migration to an empty Postgres and fails on schema drift; scans history with gitleaks; builds the backend image without pushing |
-| `deploy.yml` | push to `main` touching backend paths, or **Run workflow** | builds the image, pushes it to GHCR tagged `<short-sha>` and `production-latest`, then deploys it over SSH and verifies |
+| Workflow     | Runs on                                                    | Does                                                                                                                                                                                                                                   |
+| ------------ | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ci.yml`     | every push and pull request, any fork                      | install → build shared → typecheck → lint → format check → unit tests → build both apps; applies every migration to an empty Postgres and fails on schema drift; scans history with gitleaks; builds the backend image without pushing |
+| `deploy.yml` | push to `main` touching backend paths, or **Run workflow** | builds the image, pushes it to GHCR tagged `<short-sha>` and `production-latest`, then deploys it over SSH and verifies                                                                                                                |
 
 `deploy.yml` is guarded with `if: github.repository == 'TokenMinds-co/tmx-scheduler'`,
 so on a fork it is a no-op rather than a red run. To use it for your own
@@ -140,11 +140,11 @@ the one-time server setup above, and make sure the server's clone of the repo
 can `git fetch` (a public repo needs nothing; a private one needs a deploy
 key).
 
-| Secret | Purpose |
-|---|---|
-| `VPS_STAGING_HOST` | Hostname or IP the workflow SSHes to |
-| `VPS_STAGING_USER` | Login user; must be able to run `docker` |
-| `VPS_STAGING_KEY` | Private key whose public half is in that user's `authorized_keys` |
+| Secret             | Purpose                                                           |
+| ------------------ | ----------------------------------------------------------------- |
+| `VPS_STAGING_HOST` | Hostname or IP the workflow SSHes to                              |
+| `VPS_STAGING_USER` | Login user; must be able to run `docker`                          |
+| `VPS_STAGING_KEY`  | Private key whose public half is in that user's `authorized_keys` |
 
 `GITHUB_TOKEN` handles GHCR on both ends.
 

@@ -65,7 +65,10 @@ export class UnsubscribeController {
     if (!this.crypto.verifyUnsubscribe(email, signature)) return false;
 
     await this.suppression.add(email, 'unsubscribe', 'One-click unsubscribe');
-    await this.emails.cancelPendingForRecipient(email, 'Recipient unsubscribed');
+    await this.emails.cancelPendingForRecipient(
+      email,
+      'Recipient unsubscribed',
+    );
     return true;
   }
 }

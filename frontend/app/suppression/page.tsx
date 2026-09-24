@@ -2,7 +2,11 @@
 
 import { useState } from 'react';
 import useSWR from 'swr';
-import type { Paginated, SuppressionDto, SuppressionReason } from '@tmx-scheduler/shared';
+import type {
+  Paginated,
+  SuppressionDto,
+  SuppressionReason,
+} from '@tmx-scheduler/shared';
 import { SUPPRESSION_REASONS } from '@tmx-scheduler/shared';
 import { Shell } from '@/components/Shell';
 import { ICONS, Icon } from '@/components/icons';
@@ -69,7 +73,10 @@ export default function SuppressionPage() {
     try {
       const result = await api<{ added: number; submitted: number }>(
         '/suppression',
-        { method: 'POST', body: { emails: pending, reason, note: note || undefined } },
+        {
+          method: 'POST',
+          body: { emails: pending, reason, note: note || undefined },
+        },
       );
       const already = result.submitted - result.added;
       setNotice(
@@ -141,9 +148,7 @@ export default function SuppressionPage() {
             <Field label="Reason">
               <Select
                 value={reason}
-                onChange={(e) =>
-                  setReason(e.target.value as SuppressionReason)
-                }
+                onChange={(e) => setReason(e.target.value as SuppressionReason)}
               >
                 {SUPPRESSION_REASONS.map((value) => (
                   <option key={value} value={value}>
@@ -171,7 +176,11 @@ export default function SuppressionPage() {
         <Card
           title={
             list.data
-              ? plural(list.data.total, 'suppressed address', 'suppressed addresses')
+              ? plural(
+                  list.data.total,
+                  'suppressed address',
+                  'suppressed addresses',
+                )
               : 'Suppressed addresses'
           }
           actions={

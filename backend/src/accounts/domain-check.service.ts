@@ -77,7 +77,9 @@ export class DomainCheckService {
     const valid =
       domain.length > 0 &&
       domain.length <= 253 &&
-      /^(?!-)[a-z0-9-]{1,63}(?<!-)(\.(?!-)[a-z0-9-]{1,63}(?<!-))+$/.test(domain);
+      /^(?!-)[a-z0-9-]{1,63}(?<!-)(\.(?!-)[a-z0-9-]{1,63}(?<!-))+$/.test(
+        domain,
+      );
 
     if (!valid) {
       throw new BadRequestException({
