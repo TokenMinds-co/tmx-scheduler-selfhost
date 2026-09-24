@@ -1,40 +1,66 @@
 # TMX Scheduler
 
-Schedules and sends outreach email from several company mailboxes, imported from
-a spreadsheet. One repo, two apps, one shared contract package.
+[![CI](https://github.com/TokenMinds-co/tmx-scheduler/actions/workflows/ci.yml/badge.svg)](https://github.com/TokenMinds-co/tmx-scheduler/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-```
-backend/           NestJS API + poller + send worker (Prisma + Postgres)
-frontend/          Next.js admin UI
-packages/shared/   TypeScript contracts both sides import (@tmx-scheduler/shared)
-docker-compose.yml Redis and Mailpit for local work (Postgres is external)
-backend/Dockerfile Production image; backend/docker-compose*.yml run it
-.github/workflows/ CI on pull requests, image build + deploy on main
-```
+Self-hosted outreach email scheduler. Import a spreadsheet, send each row at
+its scheduled time from one of several company mailboxes over SMTP, keep every
+mailbox under its own daily limit and pacing gap, and see who opened and
+clicked — with the security scanners filtered out.
+
+It runs on your own server against your own mailboxes (Google Workspace,
+Microsoft 365, Zoho, or any SMTP relay). No third party holds your credentials
+or your recipient list.
+
+## Features
+
+- **Spreadsheet import with a dry run.** Every row names its sending mailbox,
+  recipient, schedule, subject and message; `{{firstName}}`-style placeholders
+  personalise it. The dry run runs the same validation and writes nothing.
+- **Per-row timezones, never guessed.** A schedule cell may carry its own zone;
+  an unrecognised one rejects the row instead of silently shifting it.
+- **Several mailboxes, each throttled atomically.** Daily limit, warm-up
+  default, and a minimum gap between sends with jitter — checked and written in
+  one SQL statement, so concurrent workers cannot collectively exceed a limit.
+- **Postgres holds the schedule; Redis only holds what is due now.** A pending
+  message can be cancelled or rescheduled with one update.
+- **Retries with backoff and jitter**, recorded on the queue row so the
+  dashboard shows the real attempt count and next attempt time.
+- **Hard bounces suppress the address** and cancel everything still queued for
+  it; quota and rate errors are treated as transient.
+- **One-click unsubscribe** — a signed link plus RFC 8058
+  `List-Unsubscribe` / `List-Unsubscribe-Post` headers, so Gmail and Outlook
+  show their native button.
+- **Open and click tracking with scanner filtering.** Raw hits are stored
+  unfiltered and judged on read, so when the rules improve every past batch is
+  re-judged for free.
+- **Signature builder.** Table-based HTML that survives Outlook, plus an
+  authored plain-text half; hand-written HTML is accepted and sanitised.
+- **Guided mailbox setup.** Reads the sending domain's MX and SPF records to
+  work out the provider, then walks through creating an app password.
+- **SMTP password or OAuth2** (Google, Microsoft) for authentication.
+- **Append-only audit log** of every mailbox edit, import and bulk action.
+- **Secrets encrypted at rest** with AES-256-GCM under a key you hold.
+- **Mailpit in the dev loop**, so nothing escapes while you try it out.
 
 ## Quick start
 
+Needs Node 22 (`.nvmrc`), pnpm (via `corepack enable`) and Docker.
+
 ```bash
+git clone https://github.com/TokenMinds-co/tmx-scheduler.git && cd tmx-scheduler
 pnpm install
-pnpm infra:up                        # Redis, Mailpit
-
-# Postgres is not in docker-compose: the app uses the existing local-postgres
-# container on 127.0.0.1:5433, in its own database.
-docker exec local-postgres psql -U postgres -c "CREATE DATABASE mail_scheduler;"
-
-cp backend/.env.example backend/.env
-pnpm --filter backend keygen         # paste into CREDS_KEY
-# also set JWT_SECRET and UNSUBSCRIBE_SECRET to long random strings
-
-cp frontend/.env.local.example frontend/.env.local
-
-pnpm --filter @tmx-scheduler/shared build      # backend and frontend import the built output
-pnpm --filter backend db:migrate     # creates the tables
-pnpm seed                            # creates the first admin from SEED_ADMIN_*
-pnpm dev                             # API on :4000, UI on :3000
+pnpm setup                                   # writes backend/.env and frontend/.env.local with fresh secrets; prints the admin password
+pnpm infra:up                                # Postgres, Redis and Mailpit, all on 127.0.0.1
+pnpm --filter @tmx-scheduler/shared build    # backend and frontend import the built output
+pnpm --filter backend db:migrate             # creates the tables
+pnpm dev                                     # API on :4000, UI on :3000
 ```
 
-Sign in at <http://localhost:3000> with `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD`.
+Sign in at <http://localhost:3000> with the email and password `pnpm setup`
+printed. The first admin is created on boot from `SEED_ADMIN_*` whenever no
+user exists (`pnpm seed` does the same by hand). Mail sent in development lands
+in Mailpit at <http://localhost:8025>.
 
 **Setting up a mailbox for the first time?** Use the guided setup at
 <http://localhost:3000/accounts/help>. It asks for the sending address, reads
@@ -44,7 +70,20 @@ creates the mailbox at the end. `/accounts/new` remains the plain form for
 anyone who already knows their settings.
 
 `pnpm build` runs shared → backend → frontend in that order. Editing
-`packages/shared` means rebuilding it (`pnpm --filter @tmx-scheduler/shared dev` watches).
+`packages/shared` means rebuilding it (`pnpm --filter @tmx-scheduler/shared dev`
+watches).
+
+## Repository layout
+
+```
+backend/           NestJS API + poller + send worker (Prisma + Postgres, BullMQ + Redis)
+frontend/          Next.js admin UI
+packages/shared/   TypeScript contracts both sides import (@tmx-scheduler/shared)
+docs/              Deployment guide
+docker-compose.yml Postgres, Redis and Mailpit for local work
+backend/Dockerfile Production image; backend/docker-compose*.yml run it
+.github/workflows/ ci.yml checks every push and PR; deploy.yml ships main
+```
 
 ## How it works
 
@@ -68,7 +107,7 @@ atomic statements, so any number of API instances can run without a lock.
 The poller's claim uses `FOR UPDATE SKIP LOCKED`, so concurrent pollers each
 take a *different* due row instead of queueing behind the same one.
 
-**Retries live on the queue document**, not in BullMQ. The dashboard has to show
+**Retries live on the queue row**, not in BullMQ. The dashboard has to show
 the attempt count and the next attempt time, and two independent retry
 mechanisms would disagree about both. BullMQ jobs are created with `attempts: 1`.
 
@@ -99,13 +138,25 @@ team; that path derives its text part with `htmlToText`.
 
 The stored value is HTML, so a template signature also carries the fields that
 produced it in a `data-ims-signature-fields` attribute. Without it, re-opening a
-mailbox would have nothing to put back in the form.
+mailbox would have nothing to put back in the form. (`ims` is the project's
+old internal name; the attribute is part of every stored signature, so it
+stays.)
 
 `signature-templates.spec.ts` asserts every template survives
 `sanitizeSignatureHtml` **byte for byte**. The renderer and the sanitiser are
 two files that must agree on a vocabulary of tags, attributes and CSS
 properties, and when they drift nothing fails loudly — the operator approves a
 correct preview and the recipient gets the layout stripped out.
+
+### Tracking
+
+Every open and click is stored as it arrives, with the evidence attached: how
+long after the send it came, how many distinct links from the same message were
+hit within a burst, the user agent, the reverse DNS of the address, and how many
+unrelated recipients' mail the same /24 has clicked. Whether a hit was a person
+is decided when it is read, from that evidence and the rules in
+`backend/src/tracking/classify.ts`. Change a threshold and every batch ever
+sent is re-judged on the next page load; nothing has to be collected again.
 
 ### Failure handling
 
@@ -162,14 +213,16 @@ The tool enforces what it can; the rest is operational discipline.
 - **Spread a campaign across mailboxes** rather than maxing one out.
 
 Cold outreach from Gmail and Google Workspace runs against their bulk-sender
-terms independently of CAN-SPAM or GDPR obligations. That is a decision for
-whoever runs the campaign, not something the tool can settle.
+terms independently of CAN-SPAM, GDPR or PECR obligations. That is a decision
+for whoever runs the campaign, not something the tool can settle — it will
+send what you schedule, to whom you schedule it.
 
 ## Database
 
 Prisma against Postgres. The schema is `backend/prisma/schema.prisma`; migrations
 live beside it and are applied with `db:migrate` in development or `db:deploy`
-in production.
+in production. CI applies every migration to an empty database and fails if the
+result differs from the schema.
 
 `email_queue.accountId` is an indexed column rather than a foreign key. That
 preserves the delete semantics the app was built on: removing a mailbox leaves
@@ -186,13 +239,22 @@ separate decision from the storage engine.
 - Stored ciphertext is versioned (`v1.<iv>.<tag>.<data>`) so a key rotation can
   re-encrypt as a background sweep rather than a stop-the-world migration.
 - Authentication is on by default; a route opts out explicitly with `@Public()`.
-  Only `/health` and `/unsubscribe` do.
+  Only `/health`, `/unsubscribe` and the tracking endpoints do.
+- Session, unsubscribe and tracking links are signed with three separate
+  secrets, so a leaked tracking URL can never be replayed as a session.
 - Every mailbox edit, import and bulk action is written to an append-only audit
   log, secret *values* excluded.
 - Signature HTML is sanitised server-side before storage and before sending —
   whether it came from the template builder or was pasted in by hand.
+- The admin session token is kept in `localStorage` and sent as a header, not
+  as an ambient cookie: the UI and API are separate origins, and a header
+  cannot be replayed by a cross-site form post. The trade-off is that any
+  script on the admin origin could read it, which is why nothing untrusted is
+  rendered there unsanitised.
 - Turning off **Require TLS** is offered for a plain-SMTP relay on the same
   host. Over a network it sends the mailbox password in the clear.
+
+To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
 ## Environment
 
@@ -200,14 +262,20 @@ See `backend/.env.example` for the full list. The ones that matter:
 
 | Variable | Purpose |
 |---|---|
-| `DATABASE_URL` | Postgres connection string. Points at `local-postgres` on 5433 by default. |
+| `DATABASE_URL`, `REDIS_URL` | Postgres and Redis. Default to the root `docker-compose.yml` services. |
 | `CREDS_KEY` | 32 bytes base64. Encrypts stored secrets. Boot fails if wrong length. |
-| `JWT_SECRET` / `UNSUBSCRIBE_SECRET` | Separate keys, so an unsubscribe link can never be replayed as a session. |
+| `JWT_SECRET`, `UNSUBSCRIBE_SECRET`, `TRACKING_SECRET` | Separate keys, so no token issued for one purpose is valid for another. |
 | `PUBLIC_API_URL` | Base for unsubscribe links inside outgoing mail. |
+| `TRACKING_BASE_URL` | Host tracking links point at. Defaults to `PUBLIC_API_URL`; give it a subdomain of the sending domain in production. |
+| `CORS_ORIGINS` | Origins allowed to call the API — the UI's origin. |
 | `POLL_INTERVAL_MS`, `CLAIM_BATCH_SIZE` | Poller cadence and per-tick budget. |
 | `SEND_CONCURRENCY` | Ceiling across all mailboxes; per-mailbox pacing is separate. |
 | `STUCK_SENDING_TIMEOUT_MS` | How long a claim may sit before the reaper takes it back. |
 | `DRY_RUN_SENDING` | Logs messages instead of sending. Use for a first run against real data. |
+| `SEED_ADMIN_*` | The first admin, created on boot when no user exists. |
+
+New mailboxes default to the `Asia/Singapore` timezone; each mailbox's zone is
+editable in its form.
 
 ## Commands
 
@@ -216,7 +284,9 @@ pnpm dev              # both apps
 pnpm build            # shared -> backend -> frontend
 pnpm test             # backend unit tests
 pnpm typecheck        # every package
-pnpm infra:up / :down # local Redis and Mailpit
+pnpm lint             # ESLint, every package
+pnpm format:check     # Prettier; `pnpm format` rewrites
+pnpm infra:up / :down # local Postgres, Redis and Mailpit
 pnpm seed             # first admin (refuses to run if any user exists)
 
 pnpm --filter backend db:migrate   # create/apply a migration in development
@@ -226,119 +296,36 @@ pnpm --filter backend db:studio    # browse the data
 
 ## Deployment
 
-The backend ships as a Docker image on GHCR and is deployed to a VPS over SSH
-by [`.github/workflows/backend.yml`](.github/workflows/backend.yml). The
-frontend is not covered by that workflow.
+The backend ships as a Docker image, `ghcr.io/tokenminds-co/tmx-scheduler-backend`,
+built from [`backend/Dockerfile`](backend/Dockerfile); the frontend is a
+standard Next.js app. [docs/deployment.md](docs/deployment.md) covers the
+image, running it with Docker Compose against your own Postgres and Redis, the
+frontend, and the GitHub Actions pipeline this repository deploys itself with.
 
-| Trigger | What runs |
-|---|---|
-| PR to `main` touching backend paths | typecheck → unit tests → build, **and** image → GHCR → deploy |
-| Push to `main` touching backend paths | image → push to GHCR → SSH deploy → verify |
-| **Run workflow** (manual) | same as a push, without needing a commit |
+## Roadmap
 
-Backend paths are `backend/**`, `packages/shared/**`, the root manifests and
-lockfile, `.dockerignore` and the workflow itself. A frontend-only or docs-only
-push does not spend a deploy.
+Known gaps, each an open issue:
 
-**Pull requests currently deploy**, so a branch can be exercised on the real
-server before it merges. There is one server, so whichever branch built last is
-what is running — and a PR build does not move the `production-latest` tag, only
-the `<short-sha>` one the deploy pins to. To go back to deploying only `main`,
-restore `if: github.event_name != 'pull_request'` on the `build-and-push` and
-`deploy` jobs; the workflow carries a comment on each saying so. Nothing else
-needs changing.
+- **Reply detection.** A recipient who answers should drop out of the campaign.
+  Needs IMAP polling or the Gmail / Microsoft Graph APIs; today the suppression
+  list fills only from unsubscribes and hard bounces at send time.
+- **Asynchronous bounces.** A delivery-status notification arriving minutes
+  after the SMTP transaction is not read. Only synchronous bounces are caught.
+- **OAuth consent flow.** Sending over XOAUTH2 works, but the refresh token has
+  to be pasted into the mailbox form.
+- **Frontend image.** The backend has a Dockerfile; the frontend does not yet.
+- **Frontend tests.** The unit tests cover the backend only.
+- **Configurable default timezone** for new mailboxes.
 
-### The image
+Issues labelled [`good first issue`](https://github.com/TokenMinds-co/tmx-scheduler/labels/good%20first%20issue)
+are scoped for a first contribution.
 
-[`backend/Dockerfile`](backend/Dockerfile) builds from the **workspace root**,
-not from `backend/` — the install needs `pnpm-lock.yaml`, `pnpm-workspace.yaml`
-and `packages/shared`:
+## Contributing
 
-```bash
-docker build -f backend/Dockerfile -t tmx-scheduler-backend .
-```
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, conventions and the pull
+request flow. Everyone taking part is expected to follow the
+[code of conduct](CODE_OF_CONDUCT.md).
 
-Builder stage installs and compiles; production stage reinstalls with `--prod`
-and copies `dist/` across. Worth knowing:
+## License
 
-- `--filter backend...` (trailing dots included) selects the backend and its
-  workspace dependencies, so the frontend's Next/React tree is never installed.
-  Its `package.json` still has to be copied in, or pnpm cannot resolve the
-  workspace graph.
-- `backend/prisma` is copied **before** `pnpm install` in both stages, because
-  the backend's `postinstall` runs `prisma generate` and needs the schema.
-- `prisma` is a runtime dependency, not a dev one: the image's `CMD` runs
-  `prisma migrate deploy` and then `exec`s Nest, so a container that cannot
-  migrate never serves. Right for one replica; at several, move the migrate to
-  a one-shot job.
-- pnpm comes from corepack, which reads `packageManager` in the root
-  `package.json` — the same version CI and developers use.
-
-### Ports
-
-The app reads `PORT` (default 4000). Both compose files pin it to **4000 inside
-the container** and treat `PORT` in `backend/.env` as the **host** port, which
-is what `"127.0.0.1:${PORT:-4000}:4000"` reads. Loopback only: a reverse proxy
-on the host is what serves it (`main.ts` trusts exactly one proxy hop).
-
-### Running the image locally
-
-```bash
-docker compose -f backend/docker-compose.yml up --build
-```
-
-Runs the backend from source against the Postgres and Redis you already have —
-the `local-postgres` container on 5433 and the root compose file's Redis on
-6379, both reached through `host.docker.internal` because inside a container
-"localhost" is the container. So `pnpm infra:up` first. This is for checking
-the image; day-to-day development uses the root `docker-compose.yml` with the
-app running on the host.
-
-### The server
-
-[`backend/docker-compose-production.yml`](backend/docker-compose-production.yml)
-pulls the image instead of building, and defines **one service**. Postgres and
-Redis are the server's own shared containers: they outlive any deploy and are
-never restarted when the API is replaced. The backend only joins their
-networks, both declared `external` so Compose refuses to start rather than
-quietly bringing up an API that can reach neither. Addresses come from
-`DATABASE_URL` and `REDIS_URL` in `.env`, where they name those containers.
-
-One-time setup on the VPS:
-
-```bash
-git clone https://github.com/TokenMinds-co/tmx-scheduler.git
-cp tmx-scheduler/backend/.env.example tmx-scheduler/backend/.env
-# fill in: DATABASE_URL and REDIS_URL (by container name), CREDS_KEY,
-# JWT_SECRET, UNSUBSCRIBE_SECRET, TRACKING_SECRET, PUBLIC_API_URL,
-# TRACKING_BASE_URL, CORS_ORIGINS, SEED_ADMIN_*
-
-# Both networks must exist and have the shared container attached:
-docker network create redis_network        # postgres_network already exists
-docker network connect redis_network <redis container>
-```
-
-The workflow needs three repository secrets: `VPS_STAGING_HOST`,
-`VPS_STAGING_USER` and `VPS_STAGING_KEY` (a private key whose public half is in
-that user's `authorized_keys`). `GITHUB_TOKEN` handles GHCR on both ends.
-
-Each deploy checks the server's clone out at the deployed commit, pulls the
-`<short-sha>` tag, runs `docker compose up -d`, then polls `GET /health` from
-inside the container until it answers 200 and reports the same `version` as
-the tag it pulled — so a deploy that silently kept the old container fails
-loudly. Old image tags are removed afterwards so they do not fill the disk.
-
-`/health` answers **503** while Postgres is unreachable. The compose healthcheck
-only reads the status line, so this is what makes it a real check rather than
-one nothing could fail.
-
-## Still open
-
-- **`email.tmx.center` MX** — run `nslookup -type=MX email.tmx.center` and use
-  the matching provider preset. That decides the real SMTP settings.
-- **Reply detection** ("reply Yes") needs IMAP polling or the Gmail/Graph API.
-  Not built; the suppression list currently fills from unsubscribes and hard
-  bounces at send time.
-- **Asynchronous bounces** (a delivery-status notification arriving minutes
-  later) are not read. Only bounces reported synchronously by the SMTP
-  transaction are caught today.
+[MIT](LICENSE).
