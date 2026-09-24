@@ -43,7 +43,7 @@ Include what you can of:
 - **Require TLS off.** Disabling it is offered for a plain-SMTP relay on the
   same host and documented as sending the password in the clear elsewhere.
 - **Session token in `localStorage`.** A deliberate trade-off — see the
-  Security section of the README. A report needs to show a way to run script
+  [security notes](docs/architecture.md#security). A report needs to show a way to run script
   on the admin origin, not that the token is readable once you can.
 - **Rate limits and lockouts** on the login endpoint are basic. Proposals are
   welcome as ordinary issues.
