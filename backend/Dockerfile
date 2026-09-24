@@ -8,7 +8,7 @@
 # ---------------------------------------------------------------------------
 # Build stage
 # ---------------------------------------------------------------------------
-FROM node:22-alpine AS builder
+FROM node:25-alpine AS builder
 
 # corepack reads `packageManager` from the root package.json, so the image
 # installs with exactly the pnpm the lockfile was written by.
@@ -47,7 +47,7 @@ RUN pnpm --filter @tmx-scheduler/shared build && \
 # ---------------------------------------------------------------------------
 # Production stage
 # ---------------------------------------------------------------------------
-FROM node:22-alpine AS production
+FROM node:25-alpine AS production
 
 RUN corepack enable pnpm
 
