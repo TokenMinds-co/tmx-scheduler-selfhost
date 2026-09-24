@@ -11,7 +11,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
-import { EMAIL_STATUSES, EmailStatus } from '@ims/shared';
+import { EMAIL_STATUSES, EmailStatus } from '@tmx-scheduler/shared';
 
 /**
  * Query strings arrive as strings, so `status=pending,failed` is split here

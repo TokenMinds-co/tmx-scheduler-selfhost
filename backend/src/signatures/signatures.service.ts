@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import type { SignatureDto } from '@ims/shared';
+import type { SignatureDto } from '@tmx-scheduler/shared';
 import { ApiException } from '../common/errors';
 import { htmlToText, sanitizeSignatureHtml } from '../common/html';
 import { PrismaService } from '../prisma/prisma.service';

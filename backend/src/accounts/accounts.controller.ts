@@ -8,7 +8,7 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
-import { PROVIDER_PRESETS } from '@ims/shared';
+import { PROVIDER_PRESETS } from '@tmx-scheduler/shared';
 import { AccountsService } from './accounts.service';
 import { TransportService } from './transport.service';
 import {

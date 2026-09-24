@@ -75,10 +75,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --filter backend...
 
-      # Before anything else: the backend imports @ims/shared through its
+      # Before anything else: the backend imports @tmx-scheduler/shared through its
       # dist/, which does not exist until this runs.
       - name: Build shared contracts
-        run: pnpm --filter @ims/shared build
+        run: pnpm --filter @tmx-scheduler/shared build
 
       - name: Type check
         run: pnpm --filter backend typecheck

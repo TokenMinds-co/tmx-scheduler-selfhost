@@ -2,7 +2,7 @@
 
 import { use } from 'react';
 import useSWR from 'swr';
-import type { AccountDto } from '@ims/shared';
+import type { AccountDto } from '@tmx-scheduler/shared';
 import { Shell } from '@/components/Shell';
 import { AccountForm } from '@/components/AccountForm';
 import { Alert, PageHeader, Spinner } from '@/components/ui';

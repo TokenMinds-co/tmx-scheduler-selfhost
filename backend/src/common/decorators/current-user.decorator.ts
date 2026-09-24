@@ -1,5 +1,5 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-import { UserRole } from '@ims/shared';
+import { UserRole } from '@tmx-scheduler/shared';
 
 export interface AuthUser {
   id: string;

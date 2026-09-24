@@ -8,7 +8,7 @@ import type {
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
 } from 'react';
-import type { EmailStatus } from '@ims/shared';
+import type { EmailStatus } from '@tmx-scheduler/shared';
 
 export function cx(...parts: Array<string | false | undefined | null>): string {
   return parts.filter(Boolean).join(' ');

@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Resolver } from 'node:dns/promises';
-import type { DetectionConfidence, DomainCheck } from '@ims/shared';
+import type { DetectionConfidence, DomainCheck } from '@tmx-scheduler/shared';
 
 /**
  * Which provider runs a domain's mail, read from that domain's public DNS.

@@ -37,6 +37,8 @@ import { HealthController } from './health.controller';
       inject: [CONFIG],
       useFactory: (config: AppConfig) => ({
         connection: { url: config.redisUrl },
+        // `ims` is the legacy internal name. Kept: changing the prefix would
+        // orphan every job already sitting in Redis.
         prefix: 'ims',
       }),
     }),

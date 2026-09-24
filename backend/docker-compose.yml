@@ -7,7 +7,7 @@
 #
 # One service, like production: Postgres and Redis stay where they already are.
 # Locally that is the `local-postgres` container on host port 5433 and the
-# `ims-redis` from the root compose file on 6379, so both are reached through
+# `tmx-redis` from the root compose file on 6379, so both are reached through
 # `host.docker.internal` — inside a container, "localhost" is the container.
 # Every other value comes from backend/.env unchanged.
 #

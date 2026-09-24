@@ -5,7 +5,7 @@ import { CryptoService } from '../common/crypto.service';
 import { escapeHtml, textToHtml } from '../common/html';
 import {
   fillSignature,
-} from '@ims/shared';
+} from '@tmx-scheduler/shared';
 import { rewriteLinks } from './link-rewrite';
 import { signatureCallToAction } from './trackable';
 import { TrackingService } from '../tracking/tracking.service';

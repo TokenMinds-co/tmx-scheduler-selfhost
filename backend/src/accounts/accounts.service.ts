@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Signature, Prisma, type Account } from '@prisma/client';
 import { DateTime } from 'luxon';
-import { AccountDto, PROVIDER_PRESETS } from '@ims/shared';
+import { AccountDto, PROVIDER_PRESETS } from '@tmx-scheduler/shared';
 import { ApiException } from '../common/errors';
 import { CryptoService } from '../common/crypto.service';
 import { PrismaService } from '../prisma/prisma.service';

@@ -11,7 +11,7 @@
 services:
   redis:
     image: redis:7-alpine
-    container_name: ims-redis
+    container_name: tmx-redis
     command: ["redis-server", "--appendonly", "yes"]
     ports:
       - "127.0.0.1:6379:6379"
@@ -29,7 +29,7 @@ services:
   # recreated.
   mailpit:
     image: axllent/mailpit:latest
-    container_name: ims-mailpit
+    container_name: tmx-mailpit
     ports:
       - "127.0.0.1:8025:8025"
       - "127.0.0.1:1025:1025"

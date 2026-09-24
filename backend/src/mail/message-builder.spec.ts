@@ -2,7 +2,7 @@ import {
   EMPTY_SIGNATURE_FIELDS,
   renderSignatureHtml,
   withSignatureState,
-} from '@ims/shared';
+} from '@tmx-scheduler/shared';
 import { MessageBuilder, type SendingAccount } from './message-builder';
 import type { CryptoService } from '../common/crypto.service';
 import type { TrackingService } from '../tracking/tracking.service';

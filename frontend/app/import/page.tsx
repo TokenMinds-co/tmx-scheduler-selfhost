@@ -3,8 +3,8 @@
 import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
 import { useRef, useState, type DragEvent } from 'react';
-import type { AccountDto, ImportResult } from '@ims/shared';
-import { COMMON_TIMEZONES, DEFAULTS, IMPORT_COLUMNS } from '@ims/shared';
+import type { AccountDto, ImportResult } from '@tmx-scheduler/shared';
+import { COMMON_TIMEZONES, DEFAULTS, IMPORT_COLUMNS } from '@tmx-scheduler/shared';
 import { Shell } from '@/components/Shell';
 import { ICONS, Icon } from '@/components/icons';
 import { api, fetcher } from '@/lib/api';

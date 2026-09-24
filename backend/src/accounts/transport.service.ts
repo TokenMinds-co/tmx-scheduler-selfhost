@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
-import { AuthType } from '@ims/shared';
+import { AuthType } from '@tmx-scheduler/shared';
 import { CryptoService } from '../common/crypto.service';
 import { ApiException } from '../common/errors';
 import type { Account } from '@prisma/client';

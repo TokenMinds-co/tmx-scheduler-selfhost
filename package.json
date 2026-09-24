@@ -1,5 +1,5 @@
 {
-  "name": "internal-mail-scheduler",
+  "name": "tmx-scheduler",
   "version": "0.1.0",
   "private": true,
   "license": "MIT",
@@ -18,7 +18,7 @@
     "dev": "pnpm -r --parallel --filter ./backend --filter ./frontend dev",
     "dev:backend": "pnpm --filter backend dev",
     "dev:frontend": "pnpm --filter frontend dev",
-    "build": "pnpm --filter @ims/shared build && pnpm -r --filter ./backend --filter ./frontend build",
+    "build": "pnpm --filter @tmx-scheduler/shared build && pnpm -r --filter ./backend --filter ./frontend build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm --filter backend test",
     "lint": "pnpm -r lint",

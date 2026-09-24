@@ -12,8 +12,8 @@ import type {
   EmailStatus,
   Paginated,
   QueueStats,
-} from '@ims/shared';
-import { EMAIL_STATUSES } from '@ims/shared';
+} from '@tmx-scheduler/shared';
+import { EMAIL_STATUSES } from '@tmx-scheduler/shared';
 import { Shell } from '@/components/Shell';
 import { ICONS, Icon } from '@/components/icons';
 import { api, fetcher } from '@/lib/api';

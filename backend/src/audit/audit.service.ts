@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { AuditEntryDto, Paginated } from '@ims/shared';
+import { AuditEntryDto, Paginated } from '@tmx-scheduler/shared';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 

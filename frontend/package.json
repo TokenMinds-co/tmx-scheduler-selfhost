@@ -11,7 +11,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@ims/shared": "workspace:*",
+    "@tmx-scheduler/shared": "workspace:*",
     "luxon": "^3.7.1",
     "next": "^15.5.2",
     "react": "^19.1.1",

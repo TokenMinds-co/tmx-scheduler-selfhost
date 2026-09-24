@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { Batch } from '@prisma/client';
-import { BatchDto, BatchStats, EMAIL_STATUSES, EmailStatus } from '@ims/shared';
+import { BatchDto, BatchStats, EMAIL_STATUSES, EmailStatus } from '@tmx-scheduler/shared';
 import { ApiException } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
 import { TrackingService } from '../tracking/tracking.service';

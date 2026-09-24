@@ -3,13 +3,18 @@
 const BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api';
 
+// `ims` is the legacy internal name; kept so existing sessions survive the rename.
 const TOKEN_KEY = 'ims_token';
 
 /**
  * The session token lives in localStorage rather than a cookie the browser
- * sends automatically. This is an internal tool on a separate origin from the
- * API, and an explicitly attached Authorization header cannot be replayed by a
- * cross-site form post the way an ambient cookie can.
+ * sends automatically. The UI and the API are on separate origins, and an
+ * explicitly attached Authorization header cannot be replayed by a cross-site
+ * form post the way an ambient cookie can. The trade-off is that any script
+ * running on the admin origin can read it — which is why signature HTML is
+ * sanitised server-side before it is ever rendered here. A deployment that
+ * wants cookie sessions instead should serve the UI and the API from one
+ * origin and add CSRF protection.
  */
 export const tokenStore = {
   get(): string | null {

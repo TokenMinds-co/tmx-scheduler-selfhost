@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import useSWR from 'swr';
-import { fillSignature, type SignatureDto } from '@ims/shared';
+import { fillSignature, type SignatureDto } from '@tmx-scheduler/shared';
 import { Shell } from '@/components/Shell';
 import { ICONS, Icon } from '@/components/icons';
 import { fetcher } from '@/lib/api';

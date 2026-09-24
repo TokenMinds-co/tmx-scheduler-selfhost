@@ -17,7 +17,7 @@ import {
   IsOptional,
   IsString,
 } from 'class-validator';
-import { SUPPRESSION_REASONS, SuppressionReason } from '@ims/shared';
+import { SUPPRESSION_REASONS, SuppressionReason } from '@tmx-scheduler/shared';
 import { SuppressionService } from './suppression.service';
 import { Roles } from '../auth/jwt-auth.guard';
 import {

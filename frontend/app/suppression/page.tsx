@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import useSWR from 'swr';
-import type { Paginated, SuppressionDto, SuppressionReason } from '@ims/shared';
-import { SUPPRESSION_REASONS } from '@ims/shared';
+import type { Paginated, SuppressionDto, SuppressionReason } from '@tmx-scheduler/shared';
+import { SUPPRESSION_REASONS } from '@tmx-scheduler/shared';
 import { Shell } from '@/components/Shell';
 import { ICONS, Icon } from '@/components/icons';
 import { api, fetcher } from '@/lib/api';

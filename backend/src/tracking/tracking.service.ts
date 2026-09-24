@@ -10,7 +10,7 @@ import type {
   EmailEventDto,
   TrackingBreakdown,
   TrackingStats,
-} from '@ims/shared';
+} from '@tmx-scheduler/shared';
 
 /** A hit, as observed at the endpoint. */
 export interface TrackingHit {

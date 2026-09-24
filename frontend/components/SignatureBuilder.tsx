@@ -13,7 +13,7 @@ import {
   withSignatureState,
   type SignatureFields,
   type SignatureTemplateId,
-} from '@ims/shared';
+} from '@tmx-scheduler/shared';
 import { ICONS, Icon } from './icons';
 import { Checkbox, Field, Input, Textarea, cx } from './ui';
 

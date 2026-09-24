@@ -3,8 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 import useSWR from 'swr';
-import type { AccountDto, AuthType, SignatureDto } from '@ims/shared';
-import { AUTH_TYPES, COMMON_TIMEZONES, PROVIDER_PRESETS } from '@ims/shared';
+import type { AccountDto, AuthType, SignatureDto } from '@tmx-scheduler/shared';
+import { AUTH_TYPES, COMMON_TIMEZONES, PROVIDER_PRESETS } from '@tmx-scheduler/shared';
 import { api, fetcher } from '@/lib/api';
 import { ICONS, Icon } from './icons';
 import {

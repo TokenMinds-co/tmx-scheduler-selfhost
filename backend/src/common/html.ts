@@ -43,6 +43,7 @@ export function sanitizeSignatureHtml(html: string): string {
         'role', 'width', 'cellpadding', 'cellspacing', 'border', 'bgcolor',
         // Where the template builder stores the fields it rendered from, so a
         // saved signature can be re-opened in the form instead of as raw HTML.
+        // `ims` is the legacy internal name, baked into stored signatures.
         'data-ims-signature', 'data-ims-signature-fields',
       ],
       div: ['data-ims-signature', 'data-ims-signature-fields'],

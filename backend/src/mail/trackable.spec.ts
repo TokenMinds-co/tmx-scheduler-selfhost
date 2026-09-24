@@ -1,4 +1,4 @@
-import { EMPTY_SIGNATURE_FIELDS, withSignatureState } from '@ims/shared';
+import { EMPTY_SIGNATURE_FIELDS, withSignatureState } from '@tmx-scheduler/shared';
 import { hasTrackableLink, signatureCallToAction } from './trackable';
 
 /** A builder signature whose P.s. points somewhere, as the library stores it. */

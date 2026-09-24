@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import useSWR from 'swr';
-import type { AuditEntryDto, Paginated, SessionUserDto, UserRole } from '@ims/shared';
+import type { AuditEntryDto, Paginated, SessionUserDto, UserRole } from '@tmx-scheduler/shared';
 import { Shell } from '@/components/Shell';
 import { ICONS, Icon } from '@/components/icons';
 import { api, fetcher } from '@/lib/api';

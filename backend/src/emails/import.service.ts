@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { parse } from 'csv-parse/sync';
-import { BatchRef, ImportResult, ImportRowError } from '@ims/shared';
+import { BatchRef, ImportResult, ImportRowError } from '@tmx-scheduler/shared';
 import { ApiException } from '../common/errors';
 import { dedupeKey } from '../common/crypto.service';
 import { sanitizeMessageHtml } from '../common/html';

@@ -482,6 +482,9 @@ export function renderSignatureText(fields: SignatureFields): string {
  * Values are percent-encoded JSON: that alphabet contains no quote or angle
  * bracket, so the payload cannot close the tag it lives in, and it holds only
  * what the signature already displays.
+ *
+ * `ims` in both attribute names is the legacy internal name. They are part of
+ * every signature already stored, so they stay.
  */
 const STATE_ATTR = 'data-ims-signature-fields';
 

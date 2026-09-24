@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import type { SignatureDto } from '@ims/shared';
+import type { SignatureDto } from '@tmx-scheduler/shared';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { SignatureBuilder, type SignatureValue } from './SignatureBuilder';

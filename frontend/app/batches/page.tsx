@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import useSWR from 'swr';
-import type { BatchDto, EmailStatus } from '@ims/shared';
+import type { BatchDto, EmailStatus } from '@tmx-scheduler/shared';
 import { Shell } from '@/components/Shell';
 import { ICONS, Icon } from '@/components/icons';
 import { api, fetcher } from '@/lib/api';

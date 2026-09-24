@@ -8,7 +8,7 @@ import {
   fillSignature,
   SENDER_EMAIL_PLACEHOLDER,
   type SignatureFields,
-} from '@ims/shared';
+} from '@tmx-scheduler/shared';
 import { sanitizeSignatureHtml, htmlToText } from './html';
 
 /**

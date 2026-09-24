@@ -11,7 +11,7 @@ import {
   type AccountDto,
   type DomainCheck,
   type SignatureDto,
-} from '@ims/shared';
+} from '@tmx-scheduler/shared';
 import useSWR from 'swr';
 import { Shell } from '@/components/Shell';
 import { SIGNATURE_NONE, SignaturePicker } from '@/components/SignaturePicker';

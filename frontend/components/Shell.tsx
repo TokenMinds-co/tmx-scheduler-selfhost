@@ -130,6 +130,7 @@ function crumbsFor(pathname: string): string[] {
 }
 
 
+// `ims` is the legacy internal name; kept so a collapsed sidebar stays collapsed.
 const COLLAPSE_KEY = 'ims_nav_collapsed';
 
 /**

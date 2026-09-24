@@ -6,7 +6,7 @@ a spreadsheet. One repo, two apps, one shared contract package.
 ```
 backend/           NestJS API + poller + send worker (Prisma + Postgres)
 frontend/          Next.js admin UI
-packages/shared/   TypeScript contracts both sides import (@ims/shared)
+packages/shared/   TypeScript contracts both sides import (@tmx-scheduler/shared)
 docker-compose.yml Redis and Mailpit for local work (Postgres is external)
 backend/Dockerfile Production image; backend/docker-compose*.yml run it
 .github/workflows/ CI on pull requests, image build + deploy on main
@@ -28,7 +28,7 @@ pnpm --filter backend keygen         # paste into CREDS_KEY
 
 cp frontend/.env.local.example frontend/.env.local
 
-pnpm --filter @ims/shared build      # backend and frontend import the built output
+pnpm --filter @tmx-scheduler/shared build      # backend and frontend import the built output
 pnpm --filter backend db:migrate     # creates the tables
 pnpm seed                            # creates the first admin from SEED_ADMIN_*
 pnpm dev                             # API on :4000, UI on :3000
@@ -44,7 +44,7 @@ creates the mailbox at the end. `/accounts/new` remains the plain form for
 anyone who already knows their settings.
 
 `pnpm build` runs shared → backend → frontend in that order. Editing
-`packages/shared` means rebuilding it (`pnpm --filter @ims/shared dev` watches).
+`packages/shared` means rebuilding it (`pnpm --filter @tmx-scheduler/shared dev` watches).
 
 ## How it works
 
