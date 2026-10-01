@@ -14,16 +14,16 @@
     "@tmx-scheduler/shared": "workspace:*",
     "luxon": "^3.7.1",
     "next": "^15.5.2",
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "swr": "^2.3.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.12",
     "@types/luxon": "^3.7.1",
     "@types/node": "^24.3.0",
-    "@types/react": "^19.1.12",
-    "@types/react-dom": "^19.1.9",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "tailwindcss": "^4.1.12",
     "typescript": "^5.9.2"
   }
